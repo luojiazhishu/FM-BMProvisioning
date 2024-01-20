@@ -1,0 +1,4694 @@
+theory PROVISIONING begin
+
+// Function signature and definition of the equational theory E
+
+builtins: diffie-hellman, multiset
+functions: cmac/2, fst/1, pair/2, rm/3, rm1/2, s1/1, sdec/2, senc/2,
+           snd/1
+equations:
+    fst(<x.1, x.2>) = x.1,
+    sdec(senc(x.1, x.2), x.2) = x.1,
+    snd(<x.1, x.2>) = x.2
+
+
+
+restriction Atomic:
+  "∀ mk #i. (Atomic( mk ) @ #i) ⇒ (¬(∃ x y. (x+y) = mk))"
+  // safety formula
+
+rule (modulo E) OOBPK_OutChannel[color=#9aff9a]:
+   [ Out_OOBPK( <channelname, SendType, ReceiveType>, D, m ) ]
+  -->
+   [ SecureOOBPK( <channelname, SendType, ReceiveType>, D, m ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) OOBPK_InChannel:
+   [ SecureOOBPK( <channelname, SendType, ReceiveType>, D, m ) ]
+  -->
+   [ In_OOBPK( <channelname, SendType, ReceiveType>, D, m ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) StaticOOB_OutChannel[color=#9aff9a]:
+   [ Out_StaticOOB( <channelname, SendType, ReceiveType>, D, m ) ]
+  -->
+   [ SecureStaticOOB( <channelname, SendType, ReceiveType>, D, m ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) StaticOOB_InChannel:
+   [ SecureStaticOOB( <channelname, SendType, ReceiveType>, D, m ) ]
+  -->
+   [ In_StaticOOB( <channelname, SendType, ReceiveType>, D, m ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Send_UserDevice[color=#9aff9a]:
+   [ Out_UD( <channelname, SendType, ReceiveType>, A, B, m ) ]
+  -->
+   [ SecureUD( <channelname, SendType, ReceiveType>, A, B, m ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Receive_UserDevice[color=#9aff9a]:
+   [ SecureUD( <channelname, SendType, ReceiveType>, A, B, m ) ]
+  -->
+   [ In_UD( <channelname, SendType, ReceiveType>, A, B, m ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Provisioner_Init[color=#ffefd5]:
+   [ Fr( ~NetKey ) ]
+  --[
+  Atomic( ~NetKey ), OnlyOneProvisioner( ), InitP_ReadStaticOOB( '0' ),
+  InitP_ReadOOBPK( '1' )
+  ]->
+   [ !Provisioner( $P, ~NetKey, '1', '0', '1', 'Provisioner' ) ]
+
+  /* has exactly the trivial AC variant */
+
+restriction OnlyOneProvisioner:
+  "∀ #i #j.
+    ((OnlyOneProvisioner( ) @ #i) ∧ (OnlyOneProvisioner( ) @ #j)) ⇒
+    (#i = #j)"
+  // safety formula
+
+rule (modulo E) NewDevice_Init_0[color=#ffefd5]:
+   [ Fr( ~DeviceUUID ) ]
+  --[
+  OnlyOneNewDevice0( ), InitD_PKType( 'InBand' ), InitD_OutputOOB( '0' ),
+  InitD_InputOOB( '1' ), InitD_StaticOOB( '1' )
+  ]->
+   [ NewDevice0( $D, ~DeviceUUID, 'InBand', '0', '1', '1', 'NewDevice' ) ]
+
+  /* has exactly the trivial AC variant */
+
+restriction OnlyOneNewDevice0:
+  "∀ #i #j.
+    ((OnlyOneNewDevice0( ) @ #i) ∧ (OnlyOneNewDevice0( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+rule (modulo E) NewDevice_Init_InBandPK_NoStaticOOB[color=#ffefd5]:
+   [
+   NewDevice0( NDev, DeviceUUID, PKType, OutputOOB, InputOOB, StaticOOB,
+               'NewDevice'
+   )
+   ]
+  --[ Eq( PKType, 'InBand' ), Eq( StaticOOB, '0' ), OnlyOneNewDevice( ) ]->
+   [
+   !NewDevice( NDev, DeviceUUID, PKType, OutputOOB, InputOOB, StaticOOB,
+               'NULL', 'NULL', 'NULL', 'NULL', 'NULL', 'NewDevice'
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) NewDevice_Init_OOBPK_NoStaticOOB[color=#ffefd5]:
+   [
+   Fr( ~skD ), Fr( ~URItoPK ),
+   NewDevice0( NDev, DeviceUUID, PKType, OutputOOB, InputOOB, StaticOOB,
+               'NewDevice'
+   )
+   ]
+  --[ Eq( PKType, 'OOB' ), Eq( StaticOOB, '0' ), OnlyOneNewDevice( ) ]->
+   [
+   !NewDevice( NDev, DeviceUUID, PKType, OutputOOB, InputOOB, StaticOOB,
+               ~skD, 'g'^~skD, ~URItoPK, 'NULL', 'NULL', 'NewDevice'
+   ),
+   !OOBPKI( NDev, DeviceUUID, 'g'^~skD, ~URItoPK, 'OOBPKI' )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) NewDevice_Init_InBandPK_StaticOOB[color=#ffefd5]:
+   [
+   Fr( ~random ), Fr( ~URItoAuth ),
+   NewDevice0( NDev, DeviceUUID, PKType, OutputOOB, InputOOB, StaticOOB,
+               'NewDevice'
+   )
+   ]
+  --[ Eq( PKType, 'InBand' ), Eq( StaticOOB, '1' ), OnlyOneNewDevice( ) ]->
+   [
+   !NewDevice( NDev, DeviceUUID, PKType, OutputOOB, InputOOB, StaticOOB,
+               'NULL', 'NULL', 'NULL', ~random, ~URItoAuth, 'NewDevice'
+   ),
+   !StaticAuthInfo( NDev, DeviceUUID, ~random, ~URItoAuth, 'StaticAuthInfo'
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) NewDevice_Init_OOBPK_StaticOOB[color=#ffefd5]:
+   [
+   Fr( ~skD ), Fr( ~URItoPK ), Fr( ~random ), Fr( ~URItoAuth ),
+   NewDevice0( NDev, DeviceUUID, PKType, OutputOOB, InputOOB, StaticOOB,
+               'NewDevice'
+   )
+   ]
+  --[ Eq( PKType, 'OOB' ), Eq( StaticOOB, '1' ), OnlyOneNewDevice( ) ]->
+   [
+   !NewDevice( NDev, DeviceUUID, PKType, OutputOOB, InputOOB, StaticOOB,
+               ~skD, 'g'^~skD, ~URItoPK, ~random, ~URItoAuth, 'NewDevice'
+   ),
+   !OOBPKI( NDev, DeviceUUID, 'g'^~skD, ~URItoPK, 'OOBPKI' ),
+   !StaticAuthInfo( NDev, DeviceUUID, ~random, ~URItoAuth, 'StaticAuthInfo'
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+restriction OnlyOneNewDevice:
+  "∀ #i #j.
+    ((OnlyOneNewDevice( ) @ #i) ∧ (OnlyOneNewDevice( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+rule (modulo E) Init_User[color=#ffefd5]:
+   [ ] --[ OnlyOneUser( ) ]-> [ !User( $User ) ]
+
+  /* has exactly the trivial AC variant */
+
+restriction OnlyOneUser:
+  "∀ #i #j. ((OnlyOneUser( ) @ #i) ∧ (OnlyOneUser( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+rule (modulo E) NDev_Beaconing[color=#fff68f]:
+   [
+   !NewDevice( NDev, DeviceUUID, PKType, OutputOOB, InputOOB, StaticOOB,
+               skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, 'NewDevice'
+   )
+   ]
+  --[ OnlyOnceBeaconing( ) ]->
+   [
+   Out( <NDev, DeviceUUID, OOBPKURI, AuthValueURI> ),
+   NDevBeaconing( NDev, DeviceUUID, PKType, OutputOOB, InputOOB, StaticOOB,
+                  skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+restriction OnlyOnceBeaconing:
+  "∀ #i #j.
+    ((OnlyOnceBeaconing( ) @ #i) ∧ (OnlyOnceBeaconing( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+rule (modulo E) Prov_LinkOpen[color=#bbffff]:
+   [
+   In( <NDev, DeviceUUID, OOBPKURI, AuthValueURI> ), Fr( ~LinkID ),
+   !Provisioner( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                 'Provisioner'
+   )
+   ]
+  --[ Neq( Prov, NDev ), OnlyOnceLinkOpen( ) ]->
+   [
+   Out( <~LinkID, 'LinkOpen', DeviceUUID> ),
+   ProvLinkOpening( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                    NDev, DeviceUUID, ~LinkID, OOBPKURI, AuthValueURI
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+restriction OnlyOnceLinkOpen:
+  "∀ #i #j.
+    ((OnlyOnceLinkOpen( ) @ #i) ∧ (OnlyOnceLinkOpen( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+rule (modulo E) NDev_LinkAck[color=#fff68f]:
+   [
+   In( <LinkID, 'LinkOpen', DeviceUUID_In> ),
+   NDevBeaconing( NDev, DeviceUUID, PKType, OutputOOB, InputOOB, StaticOOB,
+                  skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI
+   )
+   ]
+  --[ Eq( DeviceUUID_In, DeviceUUID ) ]->
+   [
+   Out( <LinkID, 'Ack'> ),
+   NDevLinkOpened( NDev, DeviceUUID, PKType, OutputOOB, InputOOB, StaticOOB,
+                   skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_CollectOOBInfo[color=#bbffff]:
+   [
+   ProvLinkOpening( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                    NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI
+   )
+   ]
+  --[ Neq( AuthValueURI, 'NULL' ), Eq( ReadStaticOOB, '1' ) ]->
+   [
+   Out_StaticOOB( <'OOBReq', 'Prov', 'OOB'>, NDev, AuthValueURI ),
+   ProvCollectingStaticOOB( Prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                            SecureOption, NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) StaticOOB_SendOOBInfo[color=#00bfff]:
+   [
+   In_StaticOOB( <'OOBReq', 'Prov', 'OOB'>, NDev_In, AuthValueURI_In ),
+   !StaticAuthInfo( NDev, DeviceUUID, AuthValue, AuthValueURI,
+                    'StaticAuthInfo'
+   )
+   ]
+  --[ Eq( NDev, NDev_In ), Eq( AuthValueURI, AuthValueURI_In ) ]->
+   [ Out_StaticOOB( <'OOBRes', 'OOB', 'Prov'>, NDev, AuthValue ) ]
+
+  // loop breaker: [0]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_StaticAuthValueCollected[color=#bbffff]:
+   [
+   In_StaticOOB( <'OOBRes', 'OOB', 'Prov'>, NDev, AuthValue ),
+   ProvCollectingStaticOOB( Prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                            SecureOption, NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI
+   )
+   ]
+  -->
+   [
+   ProvLinkOpened( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                   NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_LinkOpened[color=#bbffff]:
+   [
+   In( <LinkID, 'Ack'> ),
+   ProvLinkOpening( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                    NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI
+   )
+   ]
+  --[ CannotCollect( ReadStaticOOB, AuthValueURI ) ]->
+   [
+   !Provisioning( Prov, NDev ),
+   ProvLinkOpened( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                   NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, 'NULL'
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+restriction CannotCollect:
+  "∀ r a #i. (CannotCollect( r, a ) @ #i) ⇒ ((r = '0') ∨ (a = 'NULL'))"
+  // safety formula
+
+rule (modulo E) Prov_Invite[color=#bbffff]:
+   [
+   ProvLinkOpened( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                   NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue
+   )
+   ]
+  -->
+   [
+   Out( <LinkID, 'Invite'> ),
+   ProvInvited( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+                DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) NDev_Capabilities[color=#fff68f]:
+   [
+   In( <LinkID, 'Invite'> ),
+   NDevLinkOpened( NDev, DeviceUUID, PKType, OutputOOB, InputOOB, StaticOOB,
+                   skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID
+   )
+   ]
+  -->
+   [
+   Out( <LinkID, PKType, OutputOOB, InputOOB, StaticOOB> ),
+   NDevSentCapabilities( NDev, DeviceUUID, PKType, OutputOOB, InputOOB,
+                         StaticOOB, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_Chose_InBandPK_OutputOOB[color=#bbffff]:
+   [
+   In( <LinkID, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D> ),
+   ProvInvited( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+                DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue
+   )
+   ]
+  --[
+  UseInBandPK( PKType_D, ReadOOBPK ),
+  UseOutputOOB( OutputOOB_D, InputOOB_D, StaticOOB_D, AuthValue )
+  ]->
+   [
+   ProvChosed( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+               DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+               OutputOOB_D, InputOOB_D, StaticOOB_D, 'InBand', 'OutputOOB'
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_Chose_OOBPK_OutputOOB[color=#bbffff]:
+   [
+   In( <LinkID, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D> ),
+   ProvInvited( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+                DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue
+   )
+   ]
+  --[
+  UseOOBPK( PKType_D, ReadOOBPK ),
+  UseOutputOOB( OutputOOB_D, InputOOB_D, StaticOOB_D, AuthValue )
+  ]->
+   [
+   ProvChosed( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+               DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+               OutputOOB_D, InputOOB_D, StaticOOB_D, 'OOB', 'OutputOOB'
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_Chose_InBandPK_InputOOB[color=#bbffff]:
+   [
+   In( <LinkID, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D> ),
+   ProvInvited( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+                DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue
+   )
+   ]
+  --[
+  UseInBandPK( PKType_D, ReadOOBPK ),
+  UseInputOOB( OutputOOB_D, InputOOB_D, StaticOOB_D, AuthValue )
+  ]->
+   [
+   ProvChosed( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+               DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+               OutputOOB_D, InputOOB_D, StaticOOB_D, 'InBand', 'InputOOB'
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_Chose_OOBPK_InputOOB[color=#bbffff]:
+   [
+   In( <LinkID, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D> ),
+   ProvInvited( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+                DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue
+   )
+   ]
+  --[
+  UseOOBPK( PKType_D, ReadOOBPK ),
+  UseInputOOB( OutputOOB_D, InputOOB_D, StaticOOB_D, AuthValue )
+  ]->
+   [
+   ProvChosed( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+               DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+               OutputOOB_D, InputOOB_D, StaticOOB_D, 'OOB', 'InputOOB'
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_Chose_InBandPK_StaticOOB[color=#bbffff]:
+   [
+   In( <LinkID, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D> ),
+   ProvInvited( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+                DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue
+   )
+   ]
+  --[
+  Neq( SecureOption, '1' ), UseInBandPK( PKType_D, ReadOOBPK ),
+  Eq( StaticOOB_D, '1' ), Neq( AuthValue, 'NULL' )
+  ]->
+   [
+   ProvChosed( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+               DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+               OutputOOB_D, InputOOB_D, StaticOOB_D, 'InBand', 'StaticOOB'
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_Chose_OOBPK_StaticOOB[color=#bbffff]:
+   [
+   In( <LinkID, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D> ),
+   ProvInvited( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+                DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue
+   )
+   ]
+  --[
+  UseOOBPK( PKType_D, ReadOOBPK ), Eq( StaticOOB_D, '1' ),
+  Neq( AuthValue, 'NULL' )
+  ]->
+   [
+   ProvChosed( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+               DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+               OutputOOB_D, InputOOB_D, StaticOOB_D, 'OOB', 'StaticOOB'
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_Chose_InBandPK_NoOOB[color=#bbffff]:
+   [
+   In( <LinkID, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D> ),
+   ProvInvited( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+                DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue
+   )
+   ]
+  --[
+  Neq( SecureOption, '1' ), UseInBandPK( PKType_D, ReadOOBPK ),
+  UseNoOOB( OutputOOB_D, InputOOB_D, StaticOOB_D, AuthValue )
+  ]->
+   [
+   ProvChosed( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+               DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+               OutputOOB_D, InputOOB_D, StaticOOB_D, 'InBand', 'NoOOB'
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_Chose_OOBPK_NoOOB[color=#bbffff]:
+   [
+   In( <LinkID, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D> ),
+   ProvInvited( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+                DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue
+   )
+   ]
+  --[
+  Neq( SecureOption, '1' ), UseOOBPK( PKType_D, ReadOOBPK ),
+  UseNoOOB( OutputOOB_D, InputOOB_D, StaticOOB_D, AuthValue )
+  ]->
+   [
+   ProvChosed( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+               DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+               OutputOOB_D, InputOOB_D, StaticOOB_D, 'OOB', 'NoOOB'
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+restriction UseInBandPK:
+  "∀ p r #i. (UseInBandPK( p, r ) @ #i) ⇒ ((p = 'InBand') ∨ (r = '0'))"
+  // safety formula
+
+restriction UseOOBPK:
+  "∀ p r #i. (UseOOBPK( p, r ) @ #i) ⇒ ((p = 'OOB') ∧ (r = '1'))"
+  // safety formula
+
+restriction UseOutputOOB:
+  "∀ o i s a #j.
+    (UseOutputOOB( o, i, s, a ) @ #j) ⇒
+    (((s = '0') ∨ (a = 'NULL')) ∧ (o = '1'))"
+  // safety formula
+
+restriction UseInputOOB:
+  "∀ o i s a #j.
+    (UseInputOOB( o, i, s, a ) @ #j) ⇒
+    ((((s = '0') ∨ (a = 'NULL')) ∧ (o = '0')) ∧ (i = '1'))"
+  // safety formula
+
+restriction UseNoOOB:
+  "∀ o i s a #j.
+    (UseNoOOB( o, i, s, a ) @ #j) ⇒
+    ((((s = '0') ∨ (a = 'NULL')) ∧ (o = '0')) ∧ (i = '0'))"
+  // safety formula
+
+rule (modulo E) Prov_SendStart[color=#bbffff]:
+   [
+   ProvChosed( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+               DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+               OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P
+   )
+   ]
+  -->
+   [
+   Out( <LinkID, PKType_P, AuthMethod_P> ),
+   ProvSentStart( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                  NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                  OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) NDev_ReceiveStart[color=#fff68f]:
+   [
+   In( <LinkID, PKType_P, AuthMethod_P> ),
+   NDevSentCapabilities( NDev, DeviceUUID, PKType_D, OutputOOB_D,
+                         InputOOB_D, StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI,
+                         LinkID
+   )
+   ]
+  --[
+  ValidityCheck( PKType_P, AuthMethod_P, PKType_D, OutputOOB_D, InputOOB_D,
+                 StaticOOB_D
+  )
+  ]->
+   [
+   NDevReceivedStart( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                      StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID,
+                      PKType_P, AuthMethod_P
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+restriction ValidityCheck:
+  "∀ ppk pam dpk dout din dst #j.
+    (ValidityCheck( ppk, pam, dpk, dout, din, dst ) @ #j) ⇒
+    (((ppk = 'InBand') ∨ (dpk = 'OOB')) ∧
+     (((((pam = 'OutputOOB') ∧ (dout = '1')) ∨
+        ((pam = 'InputOOB') ∧ (din = '1'))) ∨
+       ((pam = 'StaticOOB') ∧ (dst = '1'))) ∨
+      (pam = 'NoOOB')))"
+  // safety formula
+
+rule (modulo E) Prov_SendPK_InBand[color=#bbffff]:
+   [
+   Fr( ~sk ),
+   ProvSentStart( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                  NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                  OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P
+   )
+   ]
+  --[ Eq( PKType_P, 'InBand' ), ProvInBandPK( ) ]->
+   [
+   Out( <LinkID, 'g'^~sk> ),
+   ProvSentPKInBand( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                     NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                     OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, ~sk,
+                     'g'^~sk
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) NDev_SendPK_InBand[color=#fff68f]:
+   [
+   In( <LinkID, DHpkP> ), Fr( ~sk ),
+   NDevReceivedStart( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                      StaticOOB_D, skD_NULL, DHpkD_NULL, OOBPKURI_NULL, AuthValue,
+                      AuthValueURI, LinkID, PKType_P, AuthMethod_P
+   )
+   ]
+  --[ Eq( PKType_P, 'InBand' ), NDevInBandPK( ) ]->
+   [
+   Out( <LinkID, 'g'^~sk> ),
+   NDevExchanged( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                  StaticOOB_D, ~sk, 'g'^~sk, OOBPKURI_NULL, AuthValue, AuthValueURI,
+                  LinkID, PKType_P, AuthMethod_P, DHpkP
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_ReceivePK_InBand[color=#bbffff]:
+   [
+   In( <LinkID, DHpkD> ),
+   ProvSentPKInBand( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                     NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                     OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP
+   )
+   ]
+  -->
+   [
+   ProvExchanged( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                  NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                  OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                  DHpkD
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_ReqPK_OOB[color=#bbffff]:
+   [
+   ProvSentStart( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                  NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                  OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P
+   )
+   ]
+  --[ Eq( PKType_P, 'OOB' ), Neq( OOBPKURI, 'NULL' ), ProvOOBPK( ) ]->
+   [
+   Out_OOBPK( <'OOBReq', 'Prov', 'OOB'>, NDev, OOBPKURI ),
+   ProvReqOOBPK( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+                 DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                 OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) OOBPKI_SendPK[color=#00bfff]:
+   [
+   In_OOBPK( <'OOBReq', 'Prov', 'OOB'>, NDev_In, OOBPKURI_In ),
+   !OOBPKI( NDev, DeviceUUID, DHpkD, OOBPKURI, 'OOBPKI' )
+   ]
+  --[ Eq( NDev, NDev_In ), Eq( OOBPKURI, OOBPKURI_In ) ]->
+   [ Out_OOBPK( <'OOBRes', 'OOB', 'Prov'>, NDev, DHpkD ) ]
+
+  // loop breaker: [0]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_SendPK_OOB[color=#bbffff]:
+   [
+   In_OOBPK( <'OOBRes', 'OOB', 'Prov'>, NDev, DHpkD ), Fr( ~sk ),
+   ProvReqOOBPK( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+                 DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                 OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P
+   )
+   ]
+  -->
+   [
+   Out( <LinkID, 'g'^~sk> ),
+   ProvExchanged( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                  NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                  OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, ~sk,
+                  'g'^~sk, DHpkD
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) NDev_ReceivePK_OOB[color=#fff68f]:
+   [
+   In( <LinkID, DHpkP> ),
+   NDevReceivedStart( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                      StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID,
+                      PKType_P, AuthMethod_P
+   )
+   ]
+  --[ Eq( PKType_P, 'OOB' ), NDevOOBPK( ) ]->
+   [
+   NDevExchanged( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                  StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID,
+                  PKType_P, AuthMethod_P, DHpkP
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_CalculateECDH[color=#bbffff]:
+   [
+   ProvExchanged( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                  NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                  OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                  DHpkD
+   )
+   ]
+  --[ Neq( DHpkP, DHpkD ) ]->
+   [
+   ProvCalculatedECDH( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                       NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                       OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                       DHpkD, DHpkD^skP
+   )
+   ]
+
+  /*
+  rule (modulo AC) Prov_CalculateECDH[color=#bbffff]:
+     [
+     ProvExchanged( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                    NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                    OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                    DHpkD
+     )
+     ]
+    --[ Neq( DHpkP, DHpkD ) ]->
+     [
+     ProvCalculatedECDH( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                         NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                         OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                         DHpkD, z
+     )
+     ]
+    variants (modulo AC)
+     1. DHpkD = DHpkD.22
+        skP   = skP.22
+        z     = DHpkD.22^skP.22
+    
+     2. DHpkD = DHpkD.22
+        skP   = one
+        z     = DHpkD.22
+    
+     3. DHpkD = x.22^x.23
+        skP   = skP.24
+        z     = x.22^(x.23*skP.24)
+    
+     4. DHpkD = x.22^x.23
+        skP   = inv(x.23)
+        z     = x.22
+    
+     5. DHpkD = x.22^x.23
+        skP   = inv((x.23*x.39))
+        z     = x.22^inv(x.39)
+    
+     6. DHpkD = x.22^x.23
+        skP   = (x.39*inv(x.23))
+        z     = x.22^x.39
+    
+     7. DHpkD = x.22^x.23
+        skP   = (x.39*inv((x.23*x.40)))
+        z     = x.22^(x.39*inv(x.40))
+    
+     8. DHpkD = x.22^inv(x.23)
+        skP   = x.23
+        z     = x.22
+    
+     9. DHpkD = x.22^inv(x.23)
+        skP   = inv(x.39)
+        z     = x.22^inv((x.23*x.39))
+    
+    10. DHpkD = x.22^inv(x.23)
+        skP   = (x.23*x.39)
+        z     = x.22^x.39
+    
+    11. DHpkD = x.22^inv(x.23)
+        skP   = (x.39*inv(x.40))
+        z     = x.22^(x.39*inv((x.23*x.40)))
+    
+    12. DHpkD = x.22^inv((x.23*x.24))
+        skP   = x.23
+        z     = x.22^inv(x.24)
+    
+    13. DHpkD = x.22^inv((x.23*x.24))
+        skP   = (x.23*x.40)
+        z     = x.22^(x.40*inv(x.24))
+    
+    14. DHpkD = x.22^inv((x.23*x.24))
+        skP   = (x.23*x.40*inv(x.41))
+        z     = x.22^(x.40*inv((x.24*x.41)))
+    
+    15. DHpkD = x.22^inv((x.23*x.24))
+        skP   = (x.23*inv(x.40))
+        z     = x.22^inv((x.24*x.40))
+    
+    16. DHpkD = x.22^(x.23*x.24)
+        skP   = inv(x.23)
+        z     = x.22^x.24
+    
+    17. DHpkD = x.22^(x.23*x.24)
+        skP   = inv((x.23*x.40))
+        z     = x.22^(x.24*inv(x.40))
+    
+    18. DHpkD = x.22^(x.23*x.24)
+        skP   = (x.40*inv(x.23))
+        z     = x.22^(x.24*x.40)
+    
+    19. DHpkD = x.22^(x.23*x.24)
+        skP   = (x.40*inv((x.23*x.41)))
+        z     = x.22^(x.24*x.40*inv(x.41))
+    
+    20. DHpkD = x.22^(x.23*x.24*inv(x.25))
+        skP   = inv((x.23*x.41))
+        z     = x.22^(x.24*inv((x.25*x.41)))
+    
+    21. DHpkD = x.22^(x.23*x.24*inv(x.25))
+        skP   = (x.25*x.41*inv(x.23))
+        z     = x.22^(x.24*x.41)
+    
+    22. DHpkD = x.22^(x.23*x.24*inv(x.25))
+        skP   = (x.25*x.41*inv((x.23*x.42)))
+        z     = x.22^(x.24*x.41*inv(x.42))
+    
+    23. DHpkD = x.22^(x.23*x.24*inv(x.25))
+        skP   = (x.25*inv(x.23))
+        z     = x.22^x.24
+    
+    24. DHpkD = x.22^(x.23*x.24*inv(x.25))
+        skP   = (x.25*inv((x.23*x.41)))
+        z     = x.22^(x.24*inv(x.41))
+    
+    25. DHpkD = x.22^(x.23*x.24*inv(x.25))
+        skP   = (x.41*inv((x.23*x.42)))
+        z     = x.22^(x.24*x.41*inv((x.25*x.42)))
+    
+    26. DHpkD = x.22^(x.23*x.24*inv((x.25*x.26)))
+        skP   = (x.25*x.42*inv(x.23))
+        z     = x.22^(x.24*x.42*inv(x.26))
+    
+    27. DHpkD = x.22^(x.23*x.24*inv((x.25*x.26)))
+        skP   = (x.25*x.42*inv((x.23*x.43)))
+        z     = x.22^(x.24*x.42*inv((x.26*x.43)))
+    
+    28. DHpkD = x.22^(x.23*x.24*inv((x.25*x.26)))
+        skP   = (x.25*inv(x.23))
+        z     = x.22^(x.24*inv(x.26))
+    
+    29. DHpkD = x.22^(x.23*x.24*inv((x.25*x.26)))
+        skP   = (x.25*inv((x.23*x.42)))
+        z     = x.22^(x.24*inv((x.26*x.42)))
+    
+    30. DHpkD = x.22^(x.23*inv(x.24))
+        skP   = x.24
+        z     = x.22^x.23
+    
+    31. DHpkD = x.22^(x.23*inv(x.24))
+        skP   = inv(x.40)
+        z     = x.22^(x.23*inv((x.24*x.40)))
+    
+    32. DHpkD = x.22^(x.23*inv(x.24))
+        skP   = inv((x.23*x.40))
+        z     = x.22^inv((x.24*x.40))
+    
+    33. DHpkD = x.22^(x.23*inv(x.24))
+        skP   = (x.24*x.40)
+        z     = x.22^(x.23*x.40)
+    
+    34. DHpkD = x.22^(x.23*inv(x.24))
+        skP   = (x.24*x.40*inv(x.23))
+        z     = x.22^x.40
+    
+    35. DHpkD = x.22^(x.23*inv(x.24))
+        skP   = (x.24*x.40*inv((x.23*x.41)))
+        z     = x.22^(x.40*inv(x.41))
+    
+    36. DHpkD = x.22^(x.23*inv(x.24))
+        skP   = (x.24*inv(x.23))
+        z     = x.22
+    
+    37. DHpkD = x.22^(x.23*inv(x.24))
+        skP   = (x.24*inv((x.23*x.40)))
+        z     = x.22^inv(x.40)
+    
+    38. DHpkD = x.22^(x.23*inv(x.24))
+        skP   = (x.40*inv(x.41))
+        z     = x.22^(x.23*x.40*inv((x.24*x.41)))
+    
+    39. DHpkD = x.22^(x.23*inv(x.24))
+        skP   = (x.40*inv((x.23*x.41)))
+        z     = x.22^(x.40*inv((x.24*x.41)))
+    
+    40. DHpkD = x.22^(x.23*inv((x.24*x.25)))
+        skP   = x.24
+        z     = x.22^(x.23*inv(x.25))
+    
+    41. DHpkD = x.22^(x.23*inv((x.24*x.25)))
+        skP   = (x.24*x.41)
+        z     = x.22^(x.23*x.41*inv(x.25))
+    
+    42. DHpkD = x.22^(x.23*inv((x.24*x.25)))
+        skP   = (x.24*x.41*inv(x.23))
+        z     = x.22^(x.41*inv(x.25))
+    
+    43. DHpkD = x.22^(x.23*inv((x.24*x.25)))
+        skP   = (x.24*x.41*inv(x.42))
+        z     = x.22^(x.23*x.41*inv((x.25*x.42)))
+    
+    44. DHpkD = x.22^(x.23*inv((x.24*x.25)))
+        skP   = (x.24*x.41*inv((x.23*x.42)))
+        z     = x.22^(x.41*inv((x.25*x.42)))
+    
+    45. DHpkD = x.22^(x.23*inv((x.24*x.25)))
+        skP   = (x.24*inv(x.23))
+        z     = x.22^inv(x.25)
+    
+    46. DHpkD = x.22^(x.23*inv((x.24*x.25)))
+        skP   = (x.24*inv(x.41))
+        z     = x.22^(x.23*inv((x.25*x.41)))
+    
+    47. DHpkD = x.22^(x.23*inv((x.24*x.25)))
+        skP   = (x.24*inv((x.23*x.41)))
+        z     = x.22^inv((x.25*x.41))
+  */
+
+rule (modulo E) NDev_CalculateECDH[color=#fff68f]:
+   [
+   NDevExchanged( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                  StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID,
+                  PKType_P, AuthMethod_P, DHpkP
+   )
+   ]
+  --[ Neq( DHpkP, DHpkD ) ]->
+   [
+   NDevCalculatedECDH( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                       StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID,
+                       PKType_P, AuthMethod_P, DHpkP, DHpkP^skD
+   )
+   ]
+
+  /*
+  rule (modulo AC) NDev_CalculateECDH[color=#fff68f]:
+     [
+     NDevExchanged( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                    StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID,
+                    PKType_P, AuthMethod_P, DHpkP
+     )
+     ]
+    --[ Neq( DHpkP, DHpkD ) ]->
+     [
+     NDevCalculatedECDH( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                         StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID,
+                         PKType_P, AuthMethod_P, DHpkP, z
+     )
+     ]
+    variants (modulo AC)
+     1. DHpkP = DHpkP.17
+        skD   = skD.17
+        z     = DHpkP.17^skD.17
+    
+     2. DHpkP = DHpkP.17
+        skD   = one
+        z     = DHpkP.17
+    
+     3. DHpkP = x.17^x.18
+        skD   = skD.19
+        z     = x.17^(x.18*skD.19)
+    
+     4. DHpkP = x.17^x.18
+        skD   = inv(x.18)
+        z     = x.17
+    
+     5. DHpkP = x.17^x.18
+        skD   = inv((x.18*x.28))
+        z     = x.17^inv(x.28)
+    
+     6. DHpkP = x.17^x.18
+        skD   = (x.28*inv(x.18))
+        z     = x.17^x.28
+    
+     7. DHpkP = x.17^x.18
+        skD   = (x.28*inv((x.18*x.29)))
+        z     = x.17^(x.28*inv(x.29))
+    
+     8. DHpkP = x.17^inv(x.18)
+        skD   = x.18
+        z     = x.17
+    
+     9. DHpkP = x.17^inv(x.18)
+        skD   = inv(x.28)
+        z     = x.17^inv((x.18*x.28))
+    
+    10. DHpkP = x.17^inv(x.18)
+        skD   = (x.18*x.28)
+        z     = x.17^x.28
+    
+    11. DHpkP = x.17^inv(x.18)
+        skD   = (x.28*inv(x.29))
+        z     = x.17^(x.28*inv((x.18*x.29)))
+    
+    12. DHpkP = x.17^inv((x.18*x.19))
+        skD   = x.18
+        z     = x.17^inv(x.19)
+    
+    13. DHpkP = x.17^inv((x.18*x.19))
+        skD   = (x.18*x.29)
+        z     = x.17^(x.29*inv(x.19))
+    
+    14. DHpkP = x.17^inv((x.18*x.19))
+        skD   = (x.18*x.29*inv(x.30))
+        z     = x.17^(x.29*inv((x.19*x.30)))
+    
+    15. DHpkP = x.17^inv((x.18*x.19))
+        skD   = (x.18*inv(x.29))
+        z     = x.17^inv((x.19*x.29))
+    
+    16. DHpkP = x.17^(x.18*x.19)
+        skD   = inv(x.18)
+        z     = x.17^x.19
+    
+    17. DHpkP = x.17^(x.18*x.19)
+        skD   = inv((x.18*x.29))
+        z     = x.17^(x.19*inv(x.29))
+    
+    18. DHpkP = x.17^(x.18*x.19)
+        skD   = (x.29*inv(x.18))
+        z     = x.17^(x.19*x.29)
+    
+    19. DHpkP = x.17^(x.18*x.19)
+        skD   = (x.29*inv((x.18*x.30)))
+        z     = x.17^(x.19*x.29*inv(x.30))
+    
+    20. DHpkP = x.17^(x.18*x.19*inv(x.20))
+        skD   = inv((x.18*x.30))
+        z     = x.17^(x.19*inv((x.20*x.30)))
+    
+    21. DHpkP = x.17^(x.18*x.19*inv(x.20))
+        skD   = (x.20*x.30*inv(x.18))
+        z     = x.17^(x.19*x.30)
+    
+    22. DHpkP = x.17^(x.18*x.19*inv(x.20))
+        skD   = (x.20*x.30*inv((x.18*x.31)))
+        z     = x.17^(x.19*x.30*inv(x.31))
+    
+    23. DHpkP = x.17^(x.18*x.19*inv(x.20))
+        skD   = (x.20*inv(x.18))
+        z     = x.17^x.19
+    
+    24. DHpkP = x.17^(x.18*x.19*inv(x.20))
+        skD   = (x.20*inv((x.18*x.30)))
+        z     = x.17^(x.19*inv(x.30))
+    
+    25. DHpkP = x.17^(x.18*x.19*inv(x.20))
+        skD   = (x.30*inv((x.18*x.31)))
+        z     = x.17^(x.19*x.30*inv((x.20*x.31)))
+    
+    26. DHpkP = x.17^(x.18*x.19*inv((x.20*x.21)))
+        skD   = (x.20*x.31*inv(x.18))
+        z     = x.17^(x.19*x.31*inv(x.21))
+    
+    27. DHpkP = x.17^(x.18*x.19*inv((x.20*x.21)))
+        skD   = (x.20*x.31*inv((x.18*x.32)))
+        z     = x.17^(x.19*x.31*inv((x.21*x.32)))
+    
+    28. DHpkP = x.17^(x.18*x.19*inv((x.20*x.21)))
+        skD   = (x.20*inv(x.18))
+        z     = x.17^(x.19*inv(x.21))
+    
+    29. DHpkP = x.17^(x.18*x.19*inv((x.20*x.21)))
+        skD   = (x.20*inv((x.18*x.31)))
+        z     = x.17^(x.19*inv((x.21*x.31)))
+    
+    30. DHpkP = x.17^(x.18*inv(x.19))
+        skD   = x.19
+        z     = x.17^x.18
+    
+    31. DHpkP = x.17^(x.18*inv(x.19))
+        skD   = inv(x.29)
+        z     = x.17^(x.18*inv((x.19*x.29)))
+    
+    32. DHpkP = x.17^(x.18*inv(x.19))
+        skD   = inv((x.18*x.29))
+        z     = x.17^inv((x.19*x.29))
+    
+    33. DHpkP = x.17^(x.18*inv(x.19))
+        skD   = (x.19*x.29)
+        z     = x.17^(x.18*x.29)
+    
+    34. DHpkP = x.17^(x.18*inv(x.19))
+        skD   = (x.19*x.29*inv(x.18))
+        z     = x.17^x.29
+    
+    35. DHpkP = x.17^(x.18*inv(x.19))
+        skD   = (x.19*x.29*inv((x.18*x.30)))
+        z     = x.17^(x.29*inv(x.30))
+    
+    36. DHpkP = x.17^(x.18*inv(x.19))
+        skD   = (x.19*inv(x.18))
+        z     = x.17
+    
+    37. DHpkP = x.17^(x.18*inv(x.19))
+        skD   = (x.19*inv((x.18*x.29)))
+        z     = x.17^inv(x.29)
+    
+    38. DHpkP = x.17^(x.18*inv(x.19))
+        skD   = (x.29*inv(x.30))
+        z     = x.17^(x.18*x.29*inv((x.19*x.30)))
+    
+    39. DHpkP = x.17^(x.18*inv(x.19))
+        skD   = (x.29*inv((x.18*x.30)))
+        z     = x.17^(x.29*inv((x.19*x.30)))
+    
+    40. DHpkP = x.17^(x.18*inv((x.19*x.20)))
+        skD   = x.19
+        z     = x.17^(x.18*inv(x.20))
+    
+    41. DHpkP = x.17^(x.18*inv((x.19*x.20)))
+        skD   = (x.19*x.30)
+        z     = x.17^(x.18*x.30*inv(x.20))
+    
+    42. DHpkP = x.17^(x.18*inv((x.19*x.20)))
+        skD   = (x.19*x.30*inv(x.18))
+        z     = x.17^(x.30*inv(x.20))
+    
+    43. DHpkP = x.17^(x.18*inv((x.19*x.20)))
+        skD   = (x.19*x.30*inv(x.31))
+        z     = x.17^(x.18*x.30*inv((x.20*x.31)))
+    
+    44. DHpkP = x.17^(x.18*inv((x.19*x.20)))
+        skD   = (x.19*x.30*inv((x.18*x.31)))
+        z     = x.17^(x.30*inv((x.20*x.31)))
+    
+    45. DHpkP = x.17^(x.18*inv((x.19*x.20)))
+        skD   = (x.19*inv(x.18))
+        z     = x.17^inv(x.20)
+    
+    46. DHpkP = x.17^(x.18*inv((x.19*x.20)))
+        skD   = (x.19*inv(x.30))
+        z     = x.17^(x.18*inv((x.20*x.30)))
+    
+    47. DHpkP = x.17^(x.18*inv((x.19*x.20)))
+        skD   = (x.19*inv((x.18*x.30)))
+        z     = x.17^inv((x.20*x.30))
+  */
+
+rule (modulo E) NDev_DisplayAuthValue_OutputOOB[color=#fff68f]:
+   [
+   Fr( ~random ),
+   NDevCalculatedECDH( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                       StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue_NULL, AuthValueURI_NULL,
+                       LinkID, PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+   )
+   ]
+  --[
+  Eq( AuthMethod_P, 'OutputOOB' ), NDevOutputOOB( ),
+  NDEV_DIS_AUTHVALUE( ~random )
+  ]->
+   [
+   Out_UD( <'Display', 'Device', 'User'>, NDev, $User, ~random ),
+   NDevWaitConfirm( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                    StaticOOB_D, skD, DHpkD, OOBPKURI, ~random, AuthValueURI_NULL, LinkID,
+                    PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_AskForInput_OutputOOB[color=#bbffff]:
+   [
+   ProvCalculatedECDH( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                       NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                       OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                       DHpkD, ECDHSecret
+   )
+   ]
+  --[ Eq( AuthMethod_P, 'OutputOOB' ), ProvOutputOOB( ) ]->
+   [
+   Out_UD( <'AskForInput', 'Device', 'User'>, Prov, $User, 'Input' ),
+   ProvAskedForInput( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                      NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                      OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                      DHpkD, ECDHSecret
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_GetAuthValue_OutputOOB[color=#bbffff]:
+   [
+   In_UD( <'Input', 'User', 'Device'>, $User, Prov, random ),
+   ProvAskedForInput( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                      NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI_NULL, AuthValue_NULL,
+                      PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P,
+                      skP, DHpkP, DHpkD, ECDHSecret
+   )
+   ]
+  -->
+   [
+   ProvReadyForConfirm( Prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                        SecureOption, NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI_NULL,
+                        random, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P,
+                        AuthMethod_P, skP, DHpkP, DHpkD, ECDHSecret
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_DisplayAuthValue_InputOOB[color=#bbffff]:
+   [
+   Fr( ~random ),
+   ProvCalculatedECDH( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                       NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI_NULL, AuthValue_NULL,
+                       PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P,
+                       skP, DHpkP, DHpkD, ECDHSecret
+   )
+   ]
+  --[
+  Eq( AuthMethod_P, 'InputOOB' ), ProvInputOOB( ),
+  PROV_DIS_AUTHVALUE( ~random )
+  ]->
+   [
+   Out_UD( <'Display', 'Device', 'User'>, Prov, $User, ~random ),
+   ProvWaitInputComplete( Prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                          SecureOption, NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI_NULL,
+                          ~random, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P,
+                          AuthMethod_P, skP, DHpkP, DHpkD, ECDHSecret
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) NDev_AskForInput_InputOOB[color=#fff68f]:
+   [
+   NDevCalculatedECDH( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                       StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID,
+                       PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+   )
+   ]
+  --[ Eq( AuthMethod_P, 'InputOOB' ), NDevInputOOB( ) ]->
+   [
+   Out_UD( <'AskForInput', 'Device', 'User'>, NDev, $User, 'Input' ),
+   NDevAskForInput( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                    StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID,
+                    PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) NDev_GetAuthValue_InputOOB[color=#fff68f]:
+   [
+   In_UD( <'Input', 'User', 'Device'>, $User, NDev, random ),
+   NDevAskForInput( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                    StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue_NULL, AuthValueURI_NULL,
+                    LinkID, PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+   )
+   ]
+  --[ NDEV_ASKFORINPUT( NDev, LinkID ) ]->
+   [
+   Out( <LinkID, 'InputComplete'> ),
+   NDevWaitConfirm( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                    StaticOOB_D, skD, DHpkD, OOBPKURI, random, AuthValueURI_NULL, LinkID,
+                    PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_ReadyForConfirm_InputOOB[color=#bbffff]:
+   [
+   In( <LinkID, 'InputComplete'> ),
+   ProvWaitInputComplete( Prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                          SecureOption, NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI,
+                          AuthValue, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P,
+                          AuthMethod_P, skP, DHpkP, DHpkD, ECDHSecret
+   )
+   ]
+  -->
+   [
+   ProvReadyForConfirm( Prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                        SecureOption, NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI,
+                        AuthValue, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P,
+                        AuthMethod_P, skP, DHpkP, DHpkD, ECDHSecret
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_GetAuthValue_StaticOOB[color=#bbffff]:
+   [
+   ProvCalculatedECDH( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                       NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                       OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                       DHpkD, ECDHSecret
+   )
+   ]
+  --[
+  PROV_STA_AUTHVALUE( AuthValue ), Eq( AuthMethod_P, 'StaticOOB' ),
+  ProvStaticOOB( )
+  ]->
+   [
+   ProvReadyForConfirm( Prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                        SecureOption, NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI,
+                        AuthValue, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P,
+                        AuthMethod_P, skP, DHpkP, DHpkD, ECDHSecret
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) NDev_GetAuthValue_StaticOOB[color=#fff68f]:
+   [
+   NDevCalculatedECDH( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                       StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID,
+                       PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+   )
+   ]
+  --[
+  NDEV_STA_AUTHVALUE( AuthValue ), Eq( AuthMethod_P, 'StaticOOB' ),
+  NDevStaticOOB( )
+  ]->
+   [
+   NDevWaitConfirm( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                    StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID,
+                    PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_GetAuthValue_NoOOB[color=#bbffff]:
+   [
+   ProvCalculatedECDH( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                       NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI_NULL, AuthValue_NULL,
+                       PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P,
+                       skP, DHpkP, DHpkD, ECDHSecret
+   )
+   ]
+  --[
+  Eq( AuthMethod_P, 'NoOOB' ), ProvNoOOB( ), PROV_NOO_AUTHVALUE( '000000' )
+  ]->
+   [
+   ProvReadyForConfirm( Prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                        SecureOption, NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI_NULL,
+                        '000000', PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P,
+                        AuthMethod_P, skP, DHpkP, DHpkD, ECDHSecret
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) NDev_GetAuthValue_NoOOB[color=#fff68f]:
+   [
+   NDevCalculatedECDH( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                       StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue_NULL, AuthValueURI_NULL,
+                       LinkID, PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+   )
+   ]
+  --[
+  Eq( AuthMethod_P, 'NoOOB' ), NDevNoOOB( ), NDEV_NOO_AUTHVALUE( '000000' )
+  ]->
+   [
+   NDevWaitConfirm( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                    StaticOOB_D, skD, DHpkD, OOBPKURI, '000000', AuthValueURI_NULL, LinkID,
+                    PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) User_OutputOOB[color=#6495ed]:
+   [
+   !User( User ), !Provisioning( D1, D2 ),
+   In_UD( <'AskForInput', 'Device', 'User'>, D1, User, 'Input' ),
+   In_UD( <'Display', 'Device', 'User'>, D2, User, m )
+   ]
+  --[ OneInteraction( ) ]->
+   [ Out_UD( <'Input', 'User', 'Device'>, User, D1, m ) ]
+
+  // loop breakers: [2,3]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) User_InputOOB[color=#6495ed]:
+   [
+   !User( User ), !Provisioning( D1, D2 ),
+   In_UD( <'Display', 'Device', 'User'>, D1, User, m ),
+   In_UD( <'AskForInput', 'Device', 'User'>, D2, User, 'Input' )
+   ]
+  --[ USER_INPUT( D2 ), OneInteraction( ) ]->
+   [ Out_UD( <'Input', 'User', 'Device'>, User, D2, m ) ]
+
+  // loop breakers: [2,3]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) User_Abnormal[color=#6495ed]:
+   [
+   !User( User ), !Provisioning( D1, D2 ), Fr( ~m ),
+   In_UD( <'AskForInput', 'Device', 'User'>, D1, User, 'Input' ),
+   In_UD( <'AskForInput', 'Device', 'User'>, D2, User, 'Input' )
+   ]
+  --[ USER_ABNORM( ~m ), OneInteraction( ) ]->
+   [
+   Out_UD( <'Input', 'User', 'Device'>, User, D1, ~m ),
+   Out_UD( <'Input', 'User', 'Device'>, User, D2, ~m )
+   ]
+
+  // loop breakers: [3,4]
+  /* has exactly the trivial AC variant */
+
+restriction OneInteraction:
+  "∀ #i #j.
+    ((OneInteraction( ) @ #i) ∧ (OneInteraction( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+rule (modulo E) Prov_Confirmation[color=#bbffff]:
+   [
+   Fr( ~Np ),
+   ProvReadyForConfirm( Prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                        SecureOption, NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI,
+                        AuthValue_In, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P,
+                        AuthMethod_P, skP, DHpkP, DHpkD, ECDHSecret
+   )
+   ]
+  --[
+  PROV_GET_AUTHVALUE( AuthValue_In ),
+  Running_Prov( Prov, NDev, <ECDHSecret, ~Np, '1'> )
+  ]->
+   [
+   Out( <LinkID, 
+         cmac((<~Np, '1'>+<AuthValue_In, '2'>),
+              cmac('prck',
+                   cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                        s1(<DHpkP, DHpkD>))))
+        >
+   ),
+   ProvSentConfirmation( Prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                         SecureOption, NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI,
+                         <AuthValue_In, '2'>, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D,
+                         PKType_P, AuthMethod_P, skP, DHpkP, DHpkD, ECDHSecret, <~Np, '1'>,
+                         s1(<DHpkP, DHpkD>), <fst(ECDHSecret), '1'>, <snd(ECDHSecret), '2'>,
+                         cmac('prck',
+                              cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                   s1(<DHpkP, DHpkD>))),
+                         cmac((<~Np, '1'>+<AuthValue_In, '2'>),
+                              cmac('prck',
+                                   cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                        s1(<DHpkP, DHpkD>))))
+   )
+   ]
+
+  /*
+  rule (modulo AC) Prov_Confirmation[color=#bbffff]:
+     [
+     Fr( ~Np ),
+     ProvReadyForConfirm( Prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                          SecureOption, NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI,
+                          AuthValue_In, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P,
+                          AuthMethod_P, skP, DHpkP, DHpkD, ECDHSecret
+     )
+     ]
+    --[
+    PROV_GET_AUTHVALUE( AuthValue_In ),
+    Running_Prov( Prov, NDev, <ECDHSecret, ~Np, '1'> )
+    ]->
+     [
+     Out( <LinkID, 
+           cmac((<~Np, '1'>+<AuthValue_In, '2'>),
+                cmac('prck', cmac((<z, '1'>+<z.1, '2'>), s1(<DHpkP, DHpkD>))))
+          >
+     ),
+     ProvSentConfirmation( Prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                           SecureOption, NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI,
+                           <AuthValue_In, '2'>, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D,
+                           PKType_P, AuthMethod_P, skP, DHpkP, DHpkD, ECDHSecret, <~Np, '1'>,
+                           s1(<DHpkP, DHpkD>), <z, '1'>, <z.1, '2'>,
+                           cmac('prck', cmac((<z, '1'>+<z.1, '2'>), s1(<DHpkP, DHpkD>))),
+                           cmac((<~Np, '1'>+<AuthValue_In, '2'>),
+                                cmac('prck', cmac((<z, '1'>+<z.1, '2'>), s1(<DHpkP, DHpkD>))))
+     )
+     ]
+    variants (modulo AC)
+    1. ECDHSecret
+             = ECDHSecret.29
+       z     = fst(ECDHSecret.29)
+       z.1   = snd(ECDHSecret.29)
+    
+    2. ECDHSecret
+             = <z.30, z.31>
+       z     = z.30
+       z.1   = z.31
+  */
+
+rule (modulo E) NDev_Confirmation[color=#fff68f]:
+   [
+   In( <LinkID, Cp> ), Fr( ~Nd ),
+   NDevWaitConfirm( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                    StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue_In, AuthValueURI, LinkID,
+                    PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+   )
+   ]
+  --[
+  Neq( Cp,
+       cmac((<~Nd, '1'>+<AuthValue_In, '2'>),
+            cmac('prck',
+                 cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                      s1(<DHpkP, DHpkD>))))
+  ),
+  NDEV_GET_AUTHVALUE( AuthValue_In ),
+  Running_NDev( NDev, <ECDHSecret, ~Nd, '1'> )
+  ]->
+   [
+   Out( <LinkID, 
+         cmac((<~Nd, '1'>+<AuthValue_In, '2'>),
+              cmac('prck',
+                   cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                        s1(<DHpkP, DHpkD>))))
+        >
+   ),
+   NDevSentConfirm( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                    StaticOOB_D, skD, DHpkD, OOBPKURI, <AuthValue_In, '2'>, AuthValueURI,
+                    LinkID, PKType_P, AuthMethod_P, DHpkP, ECDHSecret, Cp, <~Nd, '1'>,
+                    s1(<DHpkP, DHpkD>), <fst(ECDHSecret), '1'>, <snd(ECDHSecret), '2'>,
+                    cmac('prck',
+                         cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                              s1(<DHpkP, DHpkD>))),
+                    cmac((<~Nd, '1'>+<AuthValue_In, '2'>),
+                         cmac('prck',
+                              cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                   s1(<DHpkP, DHpkD>))))
+   )
+   ]
+
+  /*
+  rule (modulo AC) NDev_Confirmation[color=#fff68f]:
+     [
+     In( <LinkID, Cp> ), Fr( ~Nd ),
+     NDevWaitConfirm( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                      StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue_In, AuthValueURI, LinkID,
+                      PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+     )
+     ]
+    --[
+    Neq( Cp,
+         cmac((<~Nd, '1'>+<AuthValue_In, '2'>),
+              cmac('prck', cmac((<z, '1'>+<z.1, '2'>), s1(<DHpkP, DHpkD>))))
+    ),
+    NDEV_GET_AUTHVALUE( AuthValue_In ),
+    Running_NDev( NDev, <ECDHSecret, ~Nd, '1'> )
+    ]->
+     [
+     Out( <LinkID, 
+           cmac((<~Nd, '1'>+<AuthValue_In, '2'>),
+                cmac('prck', cmac((<z, '1'>+<z.1, '2'>), s1(<DHpkP, DHpkD>))))
+          >
+     ),
+     NDevSentConfirm( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                      StaticOOB_D, skD, DHpkD, OOBPKURI, <AuthValue_In, '2'>, AuthValueURI,
+                      LinkID, PKType_P, AuthMethod_P, DHpkP, ECDHSecret, Cp, <~Nd, '1'>,
+                      s1(<DHpkP, DHpkD>), <z, '1'>, <z.1, '2'>,
+                      cmac('prck', cmac((<z, '1'>+<z.1, '2'>), s1(<DHpkP, DHpkD>))),
+                      cmac((<~Nd, '1'>+<AuthValue_In, '2'>),
+                           cmac('prck', cmac((<z, '1'>+<z.1, '2'>), s1(<DHpkP, DHpkD>))))
+     )
+     ]
+    variants (modulo AC)
+    1. ECDHSecret
+             = ECDHSecret.25
+       z     = fst(ECDHSecret.25)
+       z.1   = snd(ECDHSecret.25)
+    
+    2. ECDHSecret
+             = <z.26, z.27>
+       z     = z.26
+       z.1   = z.27
+  */
+
+rule (modulo E) Prov_SendNonce[color=#bbffff]:
+   [
+   In( <LinkID, Cd> ),
+   ProvSentConfirmation( Prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                         SecureOption, NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI,
+                         AuthValue, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P,
+                         AuthMethod_P, skP, DHpkP, DHpkD, ECDHSecret, Np, ConfirmSALT, ECDH1,
+                         ECDH2, CK, Cp
+   )
+   ]
+  --[ Neq( Cp, Cd ) ]->
+   [
+   Out( <LinkID, Np> ),
+   ProvSentNonce( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                  NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                  OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                  DHpkD, ECDHSecret, Np, ConfirmSALT, ECDH1, ECDH2, CK, Cp, Cd
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) NDev_SendNonce[color=#fff68f]:
+   [
+   In( <LinkID, Np> ),
+   NDevSentConfirm( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                    StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID,
+                    PKType_P, AuthMethod_P, DHpkP, ECDHSecret, Cp, Nd, ConfirmSALT, ECDH1,
+                    ECDH2, CK, Cd
+   )
+   ]
+  --[ Check( Cp, (AuthValue+Np), CK ) ]->
+   [
+   Out( <LinkID, Nd> ),
+   NDevSentNonce( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                  StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID,
+                  PKType_P, AuthMethod_P, DHpkP, ECDHSecret, Cp, Nd, ConfirmSALT, ECDH1,
+                  ECDH2, CK, Cd, Np, s1(<ConfirmSALT, Np, Nd>),
+                  cmac('prsk', cmac((ECDH1+ECDH2), s1(<ConfirmSALT, Np, Nd>)))
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_Check[color=#bbffff]:
+   [
+   In( <LinkID, Nd> ),
+   ProvSentNonce( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                  NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                  OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                  DHpkD, ECDHSecret, Np, ConfirmSALT, ECDH1, ECDH2, CK, Cp, Cd
+   )
+   ]
+  --[ Check( Cd, (AuthValue+Nd), CK ) ]->
+   [
+   ProvChecked( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+                DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                DHpkD, ECDHSecret, Np, ConfirmSALT, ECDH1, ECDH2, CK, Cp, Cd, Nd,
+                s1(<ConfirmSALT, Np, Nd>),
+                cmac('prsk', cmac((ECDH1+ECDH2), s1(<ConfirmSALT, Np, Nd>)))
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+restriction CheckCMAC:
+  "∀ C M K #i.
+    (Check( C, M, K ) @ #i) ⇒
+    (((C = cmac(M, K)) ∨
+      (∃ mk mo.
+        (((mk+mo) = M) ∧ (¬(∃ x y. (x+y) = mk))) ∧ (mk = rm(C, mo, K)))) ∨
+     ((¬(∃ x y. (x+y) = M)) ∧ (M = rm1(C, K))))"
+
+rule (modulo E) Prov_Distribute[color=#bbffff]:
+   [
+   ProvChecked( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+                DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                DHpkD, ECDHSecret, Np, ConfirmSALT, ECDH1, ECDH2, CK, Cp, Cd, Nd,
+                ProvisioningSALT, SessionKey
+   )
+   ]
+  --[
+  Secret( SessionKey, cmac('prdk', cmac((ECDH1+ECDH2), ProvisioningSALT)),
+          NetKey
+  ),
+  Role( 'Prov' )
+  ]->
+   [
+   Out( <LinkID, senc(NetKey, SessionKey)> ),
+   ProvDistributed( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                    NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                    OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                    DHpkD, ECDHSecret, Np, ConfirmSALT, ECDH1, ECDH2, CK, Cp, Cd, Nd,
+                    ProvisioningSALT, SessionKey, senc(NetKey, SessionKey),
+                    cmac('prdk', cmac((ECDH1+ECDH2), ProvisioningSALT))
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) NDev_Complete[color=#fff68f]:
+   [
+   In( <LinkID, senc(NetKey, SessionKey)> ),
+   NDevSentNonce( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                  StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID,
+                  PKType_P, AuthMethod_P, DHpkP, ECDHSecret, Cp, Nd, ConfirmSALT, ECDH1,
+                  ECDH2, CK, Cd, Np, ProvisioningSALT, SessionKey
+   )
+   ]
+  --[ FinishedD( ), Commit_NDev( NDev, <ECDHSecret, Np> ), Role( 'NDev' )
+  ]->
+   [
+   Out( <LinkID, 'Complete'> ),
+   NDevComplete( NDev, DeviceUUID, PKType_D, OutputOOB_D, InputOOB_D,
+                 StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI, LinkID,
+                 PKType_P, AuthMethod_P, DHpkP, ECDHSecret, Cp, Nd, ConfirmSALT, ECDH1,
+                 ECDH2, CK, Cd, Np, ProvisioningSALT, SessionKey,
+                 cmac('prdk', cmac((ECDH1+ECDH2), ProvisioningSALT)), NetKey
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Prov_Complete[color=#bbffff]:
+   [
+   In( <LinkID, 'Complete'> ),
+   ProvDistributed( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                    NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                    OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                    DHpkD, ECDHSecret, Np, ConfirmSALT, ECDH1, ECDH2, CK, Cp, Cd, Nd,
+                    ProvisioningSALT, SessionKey, ProvData, DevKey
+   )
+   ]
+  --[ FinishedP( ), Commit_Prov( Prov, NDev, <ECDHSecret, Nd> ) ]->
+   [
+   ProvComplete( Prov, NetKey, ReadOOBPK, ReadStaticOOB, SecureOption, NDev,
+                 DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                 OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                 DHpkD, ECDHSecret, Np, ConfirmSALT, ECDH1, ECDH2, CK, Cp, Cd, Nd,
+                 ProvisioningSALT, SessionKey, ProvData, DevKey
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+restriction Equality:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  // safety formula
+
+restriction Inequality:
+  "∀ x #i. (Neq( x, x ) @ #i) ⇒ (⊥)"
+  // safety formula
+
+lemma types [sources]:
+  all-traces
+  "((∀ r1 #i.
+      (PROV_GET_AUTHVALUE( r1 ) @ #i) ⇒
+      (((((∃ #j. PROV_DIS_AUTHVALUE( r1 ) @ #j) ∨
+          (∃ #j. NDEV_DIS_AUTHVALUE( r1 ) @ #j)) ∨
+         (∃ #j. PROV_NOO_AUTHVALUE( r1 ) @ #j)) ∨
+        (∃ #j. PROV_STA_AUTHVALUE( r1 ) @ #j)) ∨
+       (∃ #j. USER_ABNORM( r1 ) @ #j))) ∧
+    (∀ r2 #i.
+      (NDEV_GET_AUTHVALUE( r2 ) @ #i) ⇒
+      (((((∃ #j. PROV_DIS_AUTHVALUE( r2 ) @ #j) ∨
+          (∃ #j. NDEV_DIS_AUTHVALUE( r2 ) @ #j)) ∨
+         (∃ #j. NDEV_NOO_AUTHVALUE( r2 ) @ #j)) ∨
+        (∃ #j. NDEV_STA_AUTHVALUE( r2 ) @ #j)) ∨
+       (∃ #j. USER_ABNORM( r2 ) @ #j)))) ∧
+   (∀ ndev linkid #i.
+     (NDEV_ASKFORINPUT( ndev, linkid ) @ #i) ⇒
+     (((∃ #j. USER_INPUT( ndev ) @ #j) ∨ (∃ m #l. USER_ABNORM( m ) @ #l)) ∧
+      (∃ #k. (!KU( linkid ) @ #k) ∧ (#k < #i))))"
+/*
+guarded formula characterizing all counter-examples:
+"((∃ r1 #i.
+    (PROV_GET_AUTHVALUE( r1 ) @ #i)
+   ∧
+    (∀ #j. (PROV_DIS_AUTHVALUE( r1 ) @ #j) ⇒ ⊥) ∧
+    (∀ #j. (NDEV_DIS_AUTHVALUE( r1 ) @ #j) ⇒ ⊥) ∧
+    (∀ #j. (PROV_NOO_AUTHVALUE( r1 ) @ #j) ⇒ ⊥) ∧
+    (∀ #j. (PROV_STA_AUTHVALUE( r1 ) @ #j) ⇒ ⊥) ∧
+    (∀ #j. (USER_ABNORM( r1 ) @ #j) ⇒ ⊥)) ∨
+  (∃ r2 #i.
+    (NDEV_GET_AUTHVALUE( r2 ) @ #i)
+   ∧
+    (∀ #j. (PROV_DIS_AUTHVALUE( r2 ) @ #j) ⇒ ⊥) ∧
+    (∀ #j. (NDEV_DIS_AUTHVALUE( r2 ) @ #j) ⇒ ⊥) ∧
+    (∀ #j. (NDEV_NOO_AUTHVALUE( r2 ) @ #j) ⇒ ⊥) ∧
+    (∀ #j. (NDEV_STA_AUTHVALUE( r2 ) @ #j) ⇒ ⊥) ∧
+    (∀ #j. (USER_ABNORM( r2 ) @ #j) ⇒ ⊥)) ∨
+  (∃ ndev linkid #i.
+    (NDEV_ASKFORINPUT( ndev, linkid ) @ #i)
+   ∧
+    (((∀ #j. (USER_INPUT( ndev ) @ #j) ⇒ ⊥) ∧
+      (∀ m #l. (USER_ABNORM( m ) @ #l) ⇒ ⊥)) ∨
+     (∀ #k. (!KU( linkid ) @ #k) ⇒ ¬(#k < #i)))))"
+*/
+induction
+  case empty_trace
+  by contradiction /* from formulas */
+next
+  case non_empty_trace
+  simplify
+  solve( (∃ r1 #i.
+           (PROV_GET_AUTHVALUE( r1 ) @ #i)
+          ∧
+           (∀ #j. (PROV_DIS_AUTHVALUE( r1 ) @ #j) ⇒ ⊥) ∧
+           (∀ #j. (NDEV_DIS_AUTHVALUE( r1 ) @ #j) ⇒ ⊥) ∧
+           (∀ #j. (PROV_NOO_AUTHVALUE( r1 ) @ #j) ⇒ ⊥) ∧
+           (∀ #j. (PROV_STA_AUTHVALUE( r1 ) @ #j) ⇒ ⊥) ∧
+           (∀ #j. (USER_ABNORM( r1 ) @ #j) ⇒ ⊥))  ∥
+         (∃ r2 #i.
+           (NDEV_GET_AUTHVALUE( r2 ) @ #i)
+          ∧
+           (∀ #j. (PROV_DIS_AUTHVALUE( r2 ) @ #j) ⇒ ⊥) ∧
+           (∀ #j. (NDEV_DIS_AUTHVALUE( r2 ) @ #j) ⇒ ⊥) ∧
+           (∀ #j. (NDEV_NOO_AUTHVALUE( r2 ) @ #j) ⇒ ⊥) ∧
+           (∀ #j. (NDEV_STA_AUTHVALUE( r2 ) @ #j) ⇒ ⊥) ∧
+           (∀ #j. (USER_ABNORM( r2 ) @ #j) ⇒ ⊥))  ∥
+         (∃ ndev linkid #i.
+           (NDEV_ASKFORINPUT( ndev, linkid ) @ #i)
+          ∧
+           (((∀ #j. (USER_INPUT( ndev ) @ #j) ⇒ ⊥) ∧
+             (∀ m #l. (USER_ABNORM( m ) @ #l) ⇒ ⊥)) ∨
+            (∀ #k. (!KU( linkid ) @ #k) ⇒ ¬(#k < #i)))) )
+    case case_1
+    solve( ((∀ r1 #i.
+              (PROV_GET_AUTHVALUE( r1 ) @ #i)
+             ⇒
+              ((last(#i)) ∨
+               (∃ #j. (PROV_DIS_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (NDEV_DIS_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (PROV_NOO_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (PROV_STA_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (USER_ABNORM( r1 ) @ #j) ∧ ¬(last(#j))))) ∧
+            (∀ r2 #i.
+              (NDEV_GET_AUTHVALUE( r2 ) @ #i)
+             ⇒
+              ((last(#i)) ∨
+               (∃ #j. (PROV_DIS_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (NDEV_DIS_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (NDEV_NOO_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (NDEV_STA_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (USER_ABNORM( r2 ) @ #j) ∧ ¬(last(#j))))) ∧
+            (∀ ndev linkid #i.
+              (NDEV_ASKFORINPUT( ndev, linkid ) @ #i)
+             ⇒
+              ((last(#i)) ∨
+               ((((∃ #j. (USER_INPUT( ndev ) @ #j) ∧ ¬(last(#j))) ∨
+                  (∃ m #l. (USER_ABNORM( m ) @ #l) ∧ ¬(last(#l))))) ∧
+                (∃ #k. (!KU( linkid ) @ #k) ∧ (¬(last(#k))) ∧ (#k < #i))))))  ∥
+           (∃ C M K #i.
+             (Check( C, M, K ) @ #i)
+            ∧
+             (¬(last(#i))) ∧
+             (¬(C = cmac(M, K))) ∧
+             (∀ mk mo. ((mk+mo) = M) ∧ (mk = rm(C, mo, K)) ⇒ ∃ x y. ((x+y) = mk)) ∧
+             (((∃ x y. ((x+y) = M)) ∨ (¬(M = rm1(C, K)))))) )
+      case case_1
+      solve( (last(#i))  ∥
+             (∃ #j. (PROV_DIS_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j)))  ∥
+             (∃ #j. (NDEV_DIS_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j)))  ∥
+             (∃ #j. (PROV_NOO_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j)))  ∥
+             (∃ #j. (PROV_STA_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j)))  ∥
+             (∃ #j. (USER_ABNORM( r1 ) @ #j) ∧ ¬(last(#j))) )
+        case case_1
+        solve( ProvReadyForConfirm( Prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                                    SecureOption, NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, r1,
+                                    PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P,
+                                    skP, DHpkP, DHpkD, ECDHSecret
+               ) ▶₁ #i )
+          case Prov_GetAuthValue_OutputOOB_case_1
+          solve( !KU( ~LinkID ) @ #vk.1 )
+            case Prov_Confirmation_case_1
+            by contradiction /* cyclic */
+          next
+            case Prov_Confirmation_case_2
+            by contradiction /* cyclic */
+          next
+            case Prov_Confirmation_case_3
+            by contradiction /* cyclic */
+          next
+            case Prov_Confirmation_case_4
+            by contradiction /* cyclic */
+          next
+            case Prov_Confirmation_case_5
+            by contradiction /* cyclic */
+          next
+            case Prov_Confirmation_case_6
+            by contradiction /* cyclic */
+          next
+            case Prov_Confirmation_case_7
+            by contradiction /* cyclic */
+          next
+            case Prov_LinkOpen
+            solve( splitEqs(0) )
+              case split_case_1
+              solve( splitEqs(1) )
+                case split_case_1
+                solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                       ) ▶₂ #vr.5 )
+                  case Receive_UserDevice_case_1
+                  by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                            ) ▶₃ #vr.5 )
+                next
+                  case Receive_UserDevice_case_2
+                  solve( !KU( ~DeviceUUID.1 ) @ #vk.31 )
+                    case NDev_Beaconing
+                    solve( splitEqs(4) )
+                      case split_case_1
+                      by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                ) ▶₃ #vr.5 )
+                    next
+                      case split_case_2
+                      solve( !KU( ECDHSecret^inv(~sk.1) ) @ #vk.28 )
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      next
+                        case c_exp
+                        solve( !KU( ~sk.1 ) @ #vk.34 )
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        qed
+                      qed
+                    next
+                      case split_case_3
+                      solve( !KU( x^x.1 ) @ #vk.28 )
+                        case NDev_SendPK_InBand_case_1
+                        by contradiction /* cyclic */
+                      next
+                        case NDev_SendPK_InBand_case_2
+                        by contradiction /* cyclic */
+                      next
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      next
+                        case Prov_SendPK_InBand_case_1
+                        by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                  ) ▶₃ #vr.5 )
+                      next
+                        case Prov_SendPK_InBand_case_2
+                        by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                  ) ▶₃ #vr.5 )
+                      next
+                        case c_exp
+                        by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                  ) ▶₃ #vr.5 )
+                      qed
+                    next
+                      case split_case_4
+                      solve( !KU( x^(x.1*inv(~sk.1)) ) @ #vk.28 )
+                        case NDev_SendPK_InBand_case_1
+                        by contradiction /* cyclic */
+                      next
+                        case NDev_SendPK_InBand_case_2
+                        by contradiction /* cyclic */
+                      next
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      next
+                        case Prov_SendPK_InBand_case_1
+                        solve( !KU( ~sk.1 ) @ #vk.33 )
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        qed
+                      next
+                        case Prov_SendPK_InBand_case_2
+                        solve( !KU( ~sk.1 ) @ #vk.35 )
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        qed
+                      next
+                        case c_exp
+                        solve( !KU( ~sk.1 ) @ #vk.36 )
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        qed
+                      qed
+                    next
+                      case split_case_5
+                      solve( !KU( x^inv((~sk.1*x.1)) ) @ #vk.28 )
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      next
+                        case c_exp
+                        solve( !KU( ~sk.1 ) @ #vk.35 )
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        qed
+                      qed
+                    next
+                      case split_case_6
+                      solve( !KU( x^(x.1*inv((~sk.1*x.2))) ) @ #vk.28 )
+                        case NDev_SendPK_InBand_case_1
+                        by contradiction /* cyclic */
+                      next
+                        case NDev_SendPK_InBand_case_2
+                        by contradiction /* cyclic */
+                      next
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      next
+                        case Prov_SendPK_InBand_case_1
+                        solve( !KU( ~sk.1 ) @ #vk.34 )
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        qed
+                      next
+                        case Prov_SendPK_InBand_case_2
+                        solve( !KU( ~sk.1 ) @ #vk.36 )
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        qed
+                      next
+                        case c_exp
+                        solve( !KU( ~sk.1 ) @ #vk.37 )
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        qed
+                      qed
+                    qed
+                  next
+                    case Prov_Confirmation
+                    by contradiction /* cyclic */
+                  qed
+                qed
+              next
+                case split_case_2
+                solve( !KU( ECDHSecret^inv(~sk) ) @ #vk.4 )
+                  case Prov_Confirmation
+                  by contradiction /* cyclic */
+                next
+                  case c_exp
+                  solve( !KU( ~sk ) @ #vk.22 )
+                    case Prov_Confirmation
+                    by contradiction /* cyclic */
+                  qed
+                qed
+              next
+                case split_case_3
+                solve( !KU( x^x.1 ) @ #vk.4 )
+                  case NDev_SendPK_InBand_case_1
+                  solve( (AuthMethod_P = 'InputOOB')  ∥ (AuthMethod_P = 'StaticOOB')  ∥
+                         (AuthMethod_P = 'NoOOB') )
+                    case case_1
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.31 )
+                      case NDev_Beaconing
+                      solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                             ) ▶₂ #vr.5 )
+                        case Receive_UserDevice_case_1
+                        by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                  ) ▶₃ #vr.5 )
+                      next
+                        case Receive_UserDevice_case_2
+                        solve( splitEqs(4) )
+                          case split_case_1
+                          by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                    ) ▶₃ #vr.5 )
+                        next
+                          case split_case_2
+                          solve( !KU( ECDHSecret^inv(~sk.1) ) @ #vk.28 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.34 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        next
+                          case split_case_3
+                          solve( !KU( x^x.1 ) @ #vk.28 )
+                            case NDev_SendPK_InBand_case_1
+                            by contradiction /* cyclic */
+                          next
+                            case NDev_SendPK_InBand_case_2
+                            by contradiction /* cyclic */
+                          next
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case Prov_SendPK_InBand_case_1
+                            by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                      ) ▶₃ #vr.5 )
+                          next
+                            case Prov_SendPK_InBand_case_2
+                            by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                      ) ▶₃ #vr.5 )
+                          next
+                            case c_exp
+                            by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                      ) ▶₃ #vr.5 )
+                          qed
+                        next
+                          case split_case_4
+                          solve( !KU( x^(x.1*inv(~sk.1)) ) @ #vk.28 )
+                            case NDev_SendPK_InBand_case_1
+                            by contradiction /* cyclic */
+                          next
+                            case NDev_SendPK_InBand_case_2
+                            by contradiction /* cyclic */
+                          next
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case Prov_SendPK_InBand_case_1
+                            solve( !KU( ~sk.1 ) @ #vk.33 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case Prov_SendPK_InBand_case_2
+                            solve( !KU( ~sk.1 ) @ #vk.35 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.36 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        next
+                          case split_case_5
+                          solve( !KU( x^inv((~sk.1*x.1)) ) @ #vk.28 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.35 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        next
+                          case split_case_6
+                          solve( !KU( x^(x.1*inv((~sk.1*x.2))) ) @ #vk.28 )
+                            case NDev_SendPK_InBand_case_1
+                            by contradiction /* cyclic */
+                          next
+                            case NDev_SendPK_InBand_case_2
+                            by contradiction /* cyclic */
+                          next
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case Prov_SendPK_InBand_case_1
+                            solve( !KU( ~sk.1 ) @ #vk.34 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case Prov_SendPK_InBand_case_2
+                            solve( !KU( ~sk.1 ) @ #vk.36 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.37 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        qed
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  next
+                    case case_2
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.31 )
+                      case NDev_Beaconing
+                      solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                             ) ▶₂ #vr.5 )
+                        case Receive_UserDevice
+                        by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                  ) ▶₃ #vr.5 )
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  next
+                    case case_3
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.31 )
+                      case NDev_Beaconing
+                      solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                             ) ▶₂ #vr.5 )
+                        case Receive_UserDevice
+                        by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                  ) ▶₃ #vr.5 )
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  qed
+                next
+                  case NDev_SendPK_InBand_case_2
+                  solve( (AuthMethod_P = 'InputOOB')  ∥ (AuthMethod_P = 'StaticOOB')  ∥
+                         (AuthMethod_P = 'NoOOB') )
+                    case case_1
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                             ) ▶₂ #vr.5 )
+                        case Receive_UserDevice_case_1
+                        by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                  ) ▶₃ #vr.5 )
+                      next
+                        case Receive_UserDevice_case_2
+                        solve( splitEqs(4) )
+                          case split_case_1
+                          by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                    ) ▶₃ #vr.5 )
+                        next
+                          case split_case_2
+                          solve( !KU( ECDHSecret^inv(~sk.1) ) @ #vk.28 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.35 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        next
+                          case split_case_3
+                          solve( !KU( x.1^x.2 ) @ #vk.28 )
+                            case NDev_SendPK_InBand_case_1
+                            by contradiction /* cyclic */
+                          next
+                            case NDev_SendPK_InBand_case_2
+                            by contradiction /* cyclic */
+                          next
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case Prov_SendPK_InBand_case_1
+                            by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                      ) ▶₃ #vr.5 )
+                          next
+                            case Prov_SendPK_InBand_case_2
+                            by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                      ) ▶₃ #vr.5 )
+                          next
+                            case c_exp
+                            by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                      ) ▶₃ #vr.5 )
+                          qed
+                        next
+                          case split_case_4
+                          solve( !KU( x.1^(x.2*inv(~sk.1)) ) @ #vk.28 )
+                            case NDev_SendPK_InBand_case_1
+                            by contradiction /* cyclic */
+                          next
+                            case NDev_SendPK_InBand_case_2
+                            by contradiction /* cyclic */
+                          next
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case Prov_SendPK_InBand_case_1
+                            solve( !KU( ~sk.1 ) @ #vk.34 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case Prov_SendPK_InBand_case_2
+                            solve( !KU( ~sk.1 ) @ #vk.36 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.37 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        next
+                          case split_case_5
+                          solve( !KU( x.1^inv((~sk.1*x.2)) ) @ #vk.28 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.36 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        next
+                          case split_case_6
+                          solve( !KU( x.1^(x.2*inv((~sk.1*x.3))) ) @ #vk.28 )
+                            case NDev_SendPK_InBand_case_1
+                            by contradiction /* cyclic */
+                          next
+                            case NDev_SendPK_InBand_case_2
+                            by contradiction /* cyclic */
+                          next
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case Prov_SendPK_InBand_case_1
+                            solve( !KU( ~sk.1 ) @ #vk.35 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case Prov_SendPK_InBand_case_2
+                            solve( !KU( ~sk.1 ) @ #vk.37 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.38 )
+                              case Prov_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        qed
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  next
+                    case case_2
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                             ) ▶₂ #vr.5 )
+                        case Receive_UserDevice
+                        by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                  ) ▶₃ #vr.5 )
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  next
+                    case case_3
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                             ) ▶₂ #vr.5 )
+                        case Receive_UserDevice
+                        by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                  ) ▶₃ #vr.5 )
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  qed
+                next
+                  case Prov_Confirmation
+                  by contradiction /* cyclic */
+                next
+                  case Prov_SendPK_InBand_case_1
+                  by contradiction /* from formulas */
+                next
+                  case Prov_SendPK_InBand_case_2
+                  solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                         ) ▶₂ #vr.5 )
+                    case Receive_UserDevice_case_1
+                    by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                              ) ▶₃ #vr.5 )
+                  next
+                    case Receive_UserDevice_case_2
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( splitEqs(4) )
+                        case split_case_1
+                        by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                  ) ▶₃ #vr.5 )
+                      next
+                        case split_case_2
+                        solve( !KU( ECDHSecret^inv(~sk.1) ) @ #vk.29 )
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        next
+                          case c_exp
+                          solve( !KU( ~sk.1 ) @ #vk.35 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        qed
+                      next
+                        case split_case_3
+                        solve( !KU( x.1^x.2 ) @ #vk.29 )
+                          case NDev_SendPK_InBand_case_1
+                          by contradiction /* cyclic */
+                        next
+                          case NDev_SendPK_InBand_case_2
+                          by contradiction /* cyclic */
+                        next
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        next
+                          case Prov_SendPK_InBand_case_1
+                          by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                    ) ▶₃ #vr.5 )
+                        next
+                          case Prov_SendPK_InBand_case_2
+                          by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                    ) ▶₃ #vr.5 )
+                        next
+                          case c_exp
+                          by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                    ) ▶₃ #vr.5 )
+                        qed
+                      next
+                        case split_case_4
+                        solve( !KU( x.1^(x.2*inv(~sk.1)) ) @ #vk.29 )
+                          case NDev_SendPK_InBand_case_1
+                          by contradiction /* cyclic */
+                        next
+                          case NDev_SendPK_InBand_case_2
+                          by contradiction /* cyclic */
+                        next
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        next
+                          case Prov_SendPK_InBand_case_1
+                          solve( !KU( ~sk.1 ) @ #vk.34 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        next
+                          case Prov_SendPK_InBand_case_2
+                          solve( !KU( ~sk.1 ) @ #vk.36 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        next
+                          case c_exp
+                          solve( !KU( ~sk.1 ) @ #vk.37 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        qed
+                      next
+                        case split_case_5
+                        solve( !KU( x.1^inv((~sk.1*x.2)) ) @ #vk.29 )
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        next
+                          case c_exp
+                          solve( !KU( ~sk.1 ) @ #vk.36 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        qed
+                      next
+                        case split_case_6
+                        solve( !KU( x.1^(x.2*inv((~sk.1*x.3))) ) @ #vk.29 )
+                          case NDev_SendPK_InBand_case_1
+                          by contradiction /* cyclic */
+                        next
+                          case NDev_SendPK_InBand_case_2
+                          by contradiction /* cyclic */
+                        next
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        next
+                          case Prov_SendPK_InBand_case_1
+                          solve( !KU( ~sk.1 ) @ #vk.35 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        next
+                          case Prov_SendPK_InBand_case_2
+                          solve( !KU( ~sk.1 ) @ #vk.37 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        next
+                          case c_exp
+                          solve( !KU( ~sk.1 ) @ #vk.38 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        qed
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  qed
+                next
+                  case c_exp
+                  solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                         ) ▶₂ #vr.5 )
+                    case Receive_UserDevice_case_1
+                    by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                              ) ▶₃ #vr.5 )
+                  next
+                    case Receive_UserDevice_case_2
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.33 )
+                      case NDev_Beaconing
+                      solve( splitEqs(4) )
+                        case split_case_1
+                        by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                  ) ▶₃ #vr.5 )
+                      next
+                        case split_case_2
+                        solve( !KU( ECDHSecret^inv(~sk.1) ) @ #vk.30 )
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        next
+                          case c_exp
+                          solve( !KU( ~sk.1 ) @ #vk.36 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        qed
+                      next
+                        case split_case_3
+                        solve( !KU( x.2^x.3 ) @ #vk.30 )
+                          case NDev_SendPK_InBand_case_1
+                          by contradiction /* cyclic */
+                        next
+                          case NDev_SendPK_InBand_case_2
+                          by contradiction /* cyclic */
+                        next
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        next
+                          case Prov_SendPK_InBand_case_1
+                          by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                    ) ▶₃ #vr.5 )
+                        next
+                          case Prov_SendPK_InBand_case_2
+                          by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                    ) ▶₃ #vr.5 )
+                        next
+                          case c_exp
+                          by solve( In_UD( <'Display', 'Device', 'User'>, NDev, $User, r1
+                                    ) ▶₃ #vr.5 )
+                        qed
+                      next
+                        case split_case_4
+                        solve( !KU( x.2^(x.3*inv(~sk.1)) ) @ #vk.30 )
+                          case NDev_SendPK_InBand_case_1
+                          by contradiction /* cyclic */
+                        next
+                          case NDev_SendPK_InBand_case_2
+                          by contradiction /* cyclic */
+                        next
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        next
+                          case Prov_SendPK_InBand_case_1
+                          solve( !KU( ~sk.1 ) @ #vk.35 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        next
+                          case Prov_SendPK_InBand_case_2
+                          solve( !KU( ~sk.1 ) @ #vk.37 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        next
+                          case c_exp
+                          solve( !KU( ~sk.1 ) @ #vk.38 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        qed
+                      next
+                        case split_case_5
+                        solve( !KU( x.2^inv((~sk.1*x.3)) ) @ #vk.30 )
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        next
+                          case c_exp
+                          solve( !KU( ~sk.1 ) @ #vk.37 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        qed
+                      next
+                        case split_case_6
+                        solve( !KU( x.2^(x.3*inv((~sk.1*x.4))) ) @ #vk.30 )
+                          case NDev_SendPK_InBand_case_1
+                          by contradiction /* cyclic */
+                        next
+                          case NDev_SendPK_InBand_case_2
+                          by contradiction /* cyclic */
+                        next
+                          case Prov_Confirmation
+                          by contradiction /* cyclic */
+                        next
+                          case Prov_SendPK_InBand_case_1
+                          solve( !KU( ~sk.1 ) @ #vk.36 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        next
+                          case Prov_SendPK_InBand_case_2
+                          solve( !KU( ~sk.1 ) @ #vk.38 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        next
+                          case c_exp
+                          solve( !KU( ~sk.1 ) @ #vk.39 )
+                            case Prov_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        qed
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  qed
+                qed
+              next
+                case split_case_4
+                solve( !KU( x^(x.1*inv(~sk)) ) @ #vk.4 )
+                  case NDev_SendPK_InBand_case_1
+                  solve( (AuthMethod_P = 'InputOOB')  ∥ (AuthMethod_P = 'StaticOOB')  ∥
+                         (AuthMethod_P = 'NoOOB') )
+                    case case_1
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( !KU( ~sk ) @ #vk.33 )
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  next
+                    case case_2
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( !KU( ~sk ) @ #vk.33 )
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  next
+                    case case_3
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( !KU( ~sk ) @ #vk.33 )
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  qed
+                next
+                  case NDev_SendPK_InBand_case_2
+                  solve( (AuthMethod_P = 'InputOOB')  ∥ (AuthMethod_P = 'StaticOOB')  ∥
+                         (AuthMethod_P = 'NoOOB') )
+                    case case_1
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( !KU( ~sk ) @ #vk.35 )
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  next
+                    case case_2
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( !KU( ~sk ) @ #vk.35 )
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  next
+                    case case_3
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( !KU( ~sk ) @ #vk.35 )
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  qed
+                next
+                  case Prov_Confirmation
+                  by contradiction /* cyclic */
+                next
+                  case Prov_SendPK_InBand_case_1
+                  by contradiction /* non-normal terms */
+                next
+                  case Prov_SendPK_InBand_case_2
+                  by contradiction /* non-normal terms */
+                next
+                  case c_exp
+                  solve( !KU( ~sk ) @ #vk.24 )
+                    case Prov_Confirmation
+                    by contradiction /* cyclic */
+                  qed
+                qed
+              next
+                case split_case_5
+                solve( !KU( x^inv((~sk*x.1)) ) @ #vk.4 )
+                  case Prov_Confirmation
+                  by contradiction /* cyclic */
+                next
+                  case c_exp
+                  solve( !KU( ~sk ) @ #vk.23 )
+                    case Prov_Confirmation
+                    by contradiction /* cyclic */
+                  qed
+                qed
+              next
+                case split_case_6
+                solve( !KU( x^(x.1*inv((~sk*x.2))) ) @ #vk.4 )
+                  case NDev_SendPK_InBand_case_1
+                  solve( (AuthMethod_P = 'InputOOB')  ∥ (AuthMethod_P = 'StaticOOB')  ∥
+                         (AuthMethod_P = 'NoOOB') )
+                    case case_1
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( !KU( ~sk ) @ #vk.34 )
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  next
+                    case case_2
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( !KU( ~sk ) @ #vk.34 )
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  next
+                    case case_3
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( !KU( ~sk ) @ #vk.34 )
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  qed
+                next
+                  case NDev_SendPK_InBand_case_2
+                  solve( (AuthMethod_P = 'InputOOB')  ∥ (AuthMethod_P = 'StaticOOB')  ∥
+                         (AuthMethod_P = 'NoOOB') )
+                    case case_1
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( !KU( ~sk ) @ #vk.36 )
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  next
+                    case case_2
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( !KU( ~sk ) @ #vk.36 )
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  next
+                    case case_3
+                    solve( !KU( ~DeviceUUID.1 ) @ #vk.32 )
+                      case NDev_Beaconing
+                      solve( !KU( ~sk ) @ #vk.36 )
+                        case Prov_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  qed
+                next
+                  case Prov_Confirmation
+                  by contradiction /* cyclic */
+                next
+                  case Prov_SendPK_InBand_case_1
+                  by contradiction /* non-normal terms */
+                next
+                  case Prov_SendPK_InBand_case_2
+                  by contradiction /* non-normal terms */
+                next
+                  case c_exp
+                  solve( !KU( ~sk ) @ #vk.25 )
+                    case Prov_Confirmation
+                    by contradiction /* cyclic */
+                  qed
+                qed
+              qed
+            next
+              case split_case_2
+              solve( !KU( <z, z.1>^inv(~sk) ) @ #vk.4 )
+                case Prov_Confirmation
+                by contradiction /* cyclic */
+              next
+                case c_exp
+                solve( !KU( ~sk ) @ #vk.24 )
+                  case Prov_Confirmation
+                  by contradiction /* cyclic */
+                qed
+              qed
+            qed
+          qed
+        next
+          case Prov_GetAuthValue_OutputOOB_case_2
+          by contradiction /* from formulas */
+        next
+          case Prov_ReadyForConfirm_InputOOB
+          by contradiction /* from formulas */
+        qed
+      next
+        case case_2
+        by contradiction /* from formulas */
+      next
+        case case_3
+        by contradiction /* from formulas */
+      next
+        case case_4
+        by contradiction /* from formulas */
+      next
+        case case_5
+        by contradiction /* from formulas */
+      next
+        case case_6
+        by contradiction /* from formulas */
+      qed
+    next
+      case case_2
+      solve( (∃ x y. ((x+y) = M))  ∥ (¬(M = rm1(C, K))) )
+        case case_1
+        solve( (C = cmac((x+y), K))  ∥
+               (∃ mk mo.
+                 ((mk+mo) = (x+y)) ∧ (mk = rm(C, mo, K))
+                ∧
+                 ∀ x.1 y.1. ((x.1+y.1) = mk) ⇒ ⊥) )
+          case case_1
+          by contradiction /* from formulas */
+        qed
+      next
+        case case_2
+        solve( (C = cmac(M, K))  ∥
+               (∃ mk mo.
+                 ((mk+mo) = M) ∧ (mk = rm(C, mo, K)) ∧ ∀ x y. ((x+y) = mk) ⇒ ⊥)  ∥
+               ((∀ x y. ((x+y) = M) ⇒ ⊥) ∧ (M = rm1(C, K))) )
+          case case_1
+          by contradiction /* from formulas */
+        next
+          case case_3
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  next
+    case case_2
+    solve( ((∀ r1 #i.
+              (PROV_GET_AUTHVALUE( r1 ) @ #i)
+             ⇒
+              ((last(#i)) ∨
+               (∃ #j. (PROV_DIS_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (NDEV_DIS_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (PROV_NOO_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (PROV_STA_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (USER_ABNORM( r1 ) @ #j) ∧ ¬(last(#j))))) ∧
+            (∀ r2 #i.
+              (NDEV_GET_AUTHVALUE( r2 ) @ #i)
+             ⇒
+              ((last(#i)) ∨
+               (∃ #j. (PROV_DIS_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (NDEV_DIS_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (NDEV_NOO_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (NDEV_STA_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (USER_ABNORM( r2 ) @ #j) ∧ ¬(last(#j))))) ∧
+            (∀ ndev linkid #i.
+              (NDEV_ASKFORINPUT( ndev, linkid ) @ #i)
+             ⇒
+              ((last(#i)) ∨
+               ((((∃ #j. (USER_INPUT( ndev ) @ #j) ∧ ¬(last(#j))) ∨
+                  (∃ m #l. (USER_ABNORM( m ) @ #l) ∧ ¬(last(#l))))) ∧
+                (∃ #k. (!KU( linkid ) @ #k) ∧ (¬(last(#k))) ∧ (#k < #i))))))  ∥
+           (∃ C M K #i.
+             (Check( C, M, K ) @ #i)
+            ∧
+             (¬(last(#i))) ∧
+             (¬(C = cmac(M, K))) ∧
+             (∀ mk mo. ((mk+mo) = M) ∧ (mk = rm(C, mo, K)) ⇒ ∃ x y. ((x+y) = mk)) ∧
+             (((∃ x y. ((x+y) = M)) ∨ (¬(M = rm1(C, K)))))) )
+      case case_1
+      solve( (last(#i))  ∥
+             (∃ #j. (PROV_DIS_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j)))  ∥
+             (∃ #j. (NDEV_DIS_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j)))  ∥
+             (∃ #j. (NDEV_NOO_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j)))  ∥
+             (∃ #j. (NDEV_STA_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j)))  ∥
+             (∃ #j. (USER_ABNORM( r2 ) @ #j) ∧ ¬(last(#j))) )
+        case case_1
+        solve( NDevWaitConfirm( NDev, DeviceUUID, PKType_D, OutputOOB_D,
+                                InputOOB_D, StaticOOB_D, skD, DHpkD, OOBPKURI, r2, AuthValueURI, LinkID,
+                                PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+               ) ▶₂ #i )
+          case NDev_GetAuthValue_InputOOB_case_1
+          by solve( (∃ #j. (USER_INPUT( $P ) @ #j) ∧ ¬(last(#j)))  ∥
+                    (∃ m #l. (USER_ABNORM( m ) @ #l) ∧ ¬(last(#l))) )
+        next
+          case NDev_GetAuthValue_InputOOB_case_2
+          solve( (∃ #j. (USER_INPUT( $D ) @ #j) ∧ ¬(last(#j)))  ∥
+                 (∃ m #l. (USER_ABNORM( m ) @ #l) ∧ ¬(last(#l))) )
+            case case_1
+            solve( !KU( ~LinkID.1 ) @ #vk.9 )
+              case NDev_Confirmation_case_1
+              by contradiction /* cyclic */
+            next
+              case NDev_Confirmation_case_2
+              by contradiction /* cyclic */
+            next
+              case NDev_Confirmation_case_3
+              by contradiction /* cyclic */
+            next
+              case NDev_Confirmation_case_4
+              by contradiction /* cyclic */
+            next
+              case NDev_Confirmation_case_5
+              by contradiction /* cyclic */
+            next
+              case NDev_Confirmation_case_6
+              by contradiction /* cyclic */
+            next
+              case NDev_Confirmation_case_7
+              by contradiction /* cyclic */
+            next
+              case Prov_LinkOpen
+              solve( !KU( ~DeviceUUID ) @ #vk.24 )
+                case NDev_Beaconing
+                solve( splitEqs(0) )
+                  case split_case_1
+                  solve( splitEqs(1) )
+                    case split_case_1
+                    solve( In_UD( <'Display', 'Device', 'User'>, $P, $User, r2 ) ▶₂ #vr.5 )
+                      case Receive_UserDevice
+                      by contradiction /* from formulas */
+                    qed
+                  next
+                    case split_case_2
+                    solve( !KU( ECDHSecret^inv(~sk) ) @ #vk.11 )
+                      case NDev_Confirmation
+                      by contradiction /* cyclic */
+                    next
+                      case c_exp
+                      solve( !KU( ~sk ) @ #vk.27 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    qed
+                  next
+                    case split_case_3
+                    solve( !KU( x^x.1 ) @ #vk.11 )
+                      case NDev_Confirmation
+                      by contradiction /* cyclic */
+                    next
+                      case NDev_SendPK_InBand_case_1
+                      by contradiction /* cyclic */
+                    next
+                      case NDev_SendPK_InBand_case_2
+                      by contradiction /* cyclic */
+                    next
+                      case Prov_SendPK_InBand_case_1
+                      by solve( In_UD( <'Display', 'Device', 'User'>, $P, $User, r2
+                                ) ▶₂ #vr.5 )
+                    next
+                      case Prov_SendPK_InBand_case_2
+                      solve( In_UD( <'Display', 'Device', 'User'>, $P, $User, r2 ) ▶₂ #vr.5 )
+                        case Receive_UserDevice
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_3
+                      by solve( In_UD( <'Display', 'Device', 'User'>, $P, $User, r2
+                                ) ▶₂ #vr.5 )
+                    next
+                      case Prov_SendPK_InBand_case_4
+                      solve( In_UD( <'Display', 'Device', 'User'>, $P, $User, r2 ) ▶₂ #vr.5 )
+                        case Receive_UserDevice
+                        by contradiction /* from formulas */
+                      qed
+                    next
+                      case c_exp
+                      solve( In_UD( <'Display', 'Device', 'User'>, $P, $User, r2 ) ▶₂ #vr.5 )
+                        case Receive_UserDevice
+                        by contradiction /* from formulas */
+                      qed
+                    qed
+                  next
+                    case split_case_4
+                    solve( !KU( x^(x.1*inv(~sk)) ) @ #vk.11 )
+                      case NDev_Confirmation
+                      by contradiction /* cyclic */
+                    next
+                      case NDev_SendPK_InBand_case_1
+                      by contradiction /* cyclic */
+                    next
+                      case NDev_SendPK_InBand_case_2
+                      by contradiction /* cyclic */
+                    next
+                      case Prov_SendPK_InBand_case_1
+                      solve( !KU( ~sk ) @ #vk.33 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_2
+                      solve( !KU( ~sk ) @ #vk.35 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_3
+                      solve( !KU( ~sk ) @ #vk.33 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_4
+                      solve( !KU( ~sk ) @ #vk.35 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case c_exp
+                      solve( !KU( ~sk ) @ #vk.29 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    qed
+                  next
+                    case split_case_5
+                    solve( !KU( x^inv((~sk*x.1)) ) @ #vk.11 )
+                      case NDev_Confirmation
+                      by contradiction /* cyclic */
+                    next
+                      case c_exp
+                      solve( !KU( ~sk ) @ #vk.28 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    qed
+                  next
+                    case split_case_6
+                    solve( !KU( x^(x.1*inv((~sk*x.2))) ) @ #vk.11 )
+                      case NDev_Confirmation
+                      by contradiction /* cyclic */
+                    next
+                      case NDev_SendPK_InBand_case_1
+                      by contradiction /* cyclic */
+                    next
+                      case NDev_SendPK_InBand_case_2
+                      by contradiction /* cyclic */
+                    next
+                      case Prov_SendPK_InBand_case_1
+                      solve( !KU( ~sk ) @ #vk.34 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_2
+                      solve( !KU( ~sk ) @ #vk.36 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_3
+                      solve( !KU( ~sk ) @ #vk.34 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_4
+                      solve( !KU( ~sk ) @ #vk.36 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case c_exp
+                      solve( !KU( ~sk ) @ #vk.30 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    qed
+                  qed
+                next
+                  case split_case_2
+                  solve( !KU( <z, z.1>^inv(~sk) ) @ #vk.11 )
+                    case NDev_Confirmation
+                    by contradiction /* cyclic */
+                  next
+                    case c_exp
+                    solve( !KU( ~sk ) @ #vk.29 )
+                      case NDev_Confirmation
+                      by contradiction /* cyclic */
+                    qed
+                  qed
+                qed
+              next
+                case NDev_Confirmation_case_1
+                by contradiction /* cyclic */
+              next
+                case NDev_Confirmation_case_2
+                by contradiction /* cyclic */
+              next
+                case NDev_Confirmation_case_3
+                by contradiction /* cyclic */
+              next
+                case NDev_Confirmation_case_4
+                by contradiction /* cyclic */
+              next
+                case NDev_Confirmation_case_5
+                by contradiction /* cyclic */
+              next
+                case NDev_Confirmation_case_6
+                by contradiction /* cyclic */
+              next
+                case NDev_Confirmation_case_7
+                by contradiction /* cyclic */
+              qed
+            qed
+          qed
+        next
+          case NDev_GetAuthValue_InputOOB_case_3
+          by contradiction /* from formulas */
+        next
+          case NDev_GetAuthValue_InputOOB_case_4
+          by contradiction /* from formulas */
+        next
+          case NDev_GetAuthValue_NoOOB
+          by contradiction /* from formulas */
+        next
+          case NDev_GetAuthValue_StaticOOB
+          by contradiction /* from formulas */
+        qed
+      next
+        case case_2
+        by contradiction /* from formulas */
+      next
+        case case_3
+        by contradiction /* from formulas */
+      next
+        case case_4
+        by contradiction /* from formulas */
+      next
+        case case_5
+        by contradiction /* from formulas */
+      next
+        case case_6
+        by contradiction /* from formulas */
+      qed
+    next
+      case case_2
+      solve( (∃ x y. ((x+y) = M))  ∥ (¬(M = rm1(C, K))) )
+        case case_1
+        solve( (C = cmac((x+y), K))  ∥
+               (∃ mk mo.
+                 ((mk+mo) = (x+y)) ∧ (mk = rm(C, mo, K))
+                ∧
+                 ∀ x.1 y.1. ((x.1+y.1) = mk) ⇒ ⊥) )
+          case case_1
+          by contradiction /* from formulas */
+        qed
+      next
+        case case_2
+        solve( (C = cmac(M, K))  ∥
+               (∃ mk mo.
+                 ((mk+mo) = M) ∧ (mk = rm(C, mo, K)) ∧ ∀ x y. ((x+y) = mk) ⇒ ⊥)  ∥
+               ((∀ x y. ((x+y) = M) ⇒ ⊥) ∧ (M = rm1(C, K))) )
+          case case_1
+          by contradiction /* from formulas */
+        next
+          case case_3
+          by contradiction /* from formulas */
+        qed
+      qed
+    qed
+  next
+    case case_3
+    solve( ((∀ r1 #i.
+              (PROV_GET_AUTHVALUE( r1 ) @ #i)
+             ⇒
+              ((last(#i)) ∨
+               (∃ #j. (PROV_DIS_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (NDEV_DIS_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (PROV_NOO_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (PROV_STA_AUTHVALUE( r1 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (USER_ABNORM( r1 ) @ #j) ∧ ¬(last(#j))))) ∧
+            (∀ r2 #i.
+              (NDEV_GET_AUTHVALUE( r2 ) @ #i)
+             ⇒
+              ((last(#i)) ∨
+               (∃ #j. (PROV_DIS_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (NDEV_DIS_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (NDEV_NOO_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (NDEV_STA_AUTHVALUE( r2 ) @ #j) ∧ ¬(last(#j))) ∨
+               (∃ #j. (USER_ABNORM( r2 ) @ #j) ∧ ¬(last(#j))))) ∧
+            (∀ ndev linkid #i.
+              (NDEV_ASKFORINPUT( ndev, linkid ) @ #i)
+             ⇒
+              ((last(#i)) ∨
+               ((((∃ #j. (USER_INPUT( ndev ) @ #j) ∧ ¬(last(#j))) ∨
+                  (∃ m #l. (USER_ABNORM( m ) @ #l) ∧ ¬(last(#l))))) ∧
+                (∃ #k. (!KU( linkid ) @ #k) ∧ (¬(last(#k))) ∧ (#k < #i))))))  ∥
+           (∃ C M K #i.
+             (Check( C, M, K ) @ #i)
+            ∧
+             (¬(last(#i))) ∧
+             (¬(C = cmac(M, K))) ∧
+             (∀ mk mo. ((mk+mo) = M) ∧ (mk = rm(C, mo, K)) ⇒ ∃ x y. ((x+y) = mk)) ∧
+             (((∃ x y. ((x+y) = M)) ∨ (¬(M = rm1(C, K)))))) )
+      case case_1
+      solve( ((∀ #j. (USER_INPUT( ndev ) @ #j) ⇒ ⊥) ∧
+              (∀ m #l. (USER_ABNORM( m ) @ #l) ⇒ ⊥))  ∥
+             (∀ #k. (!KU( linkid ) @ #k) ⇒ ¬(#k < #i)) )
+        case case_1
+        solve( (last(#i))  ∥
+               ((((∃ #j. (USER_INPUT( ndev ) @ #j) ∧ ¬(last(#j))) ∨
+                  (∃ m #l. (USER_ABNORM( m ) @ #l) ∧ ¬(last(#l))))) ∧
+                (∃ #k. (!KU( linkid ) @ #k) ∧ (¬(last(#k))) ∧ (#k < #i))) )
+          case case_1
+          solve( In_UD( <'Input', 'User', 'Device'>, $User, ndev, random ) ▶₀ #i )
+            case Receive_UserDevice_case_1
+            solve( NDevAskForInput( $P, DeviceUUID, PKType_D, OutputOOB_D,
+                                    InputOOB_D, StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue_NULL,
+                                    AuthValueURI_NULL, linkid, PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+                   ) ▶₁ #i )
+              case NDev_AskForInput_InputOOB
+              solve( !KU( ~LinkID ) @ #vk.1 )
+                case NDev_Confirmation_case_1
+                by contradiction /* cyclic */
+              next
+                case NDev_Confirmation_case_2
+                by contradiction /* cyclic */
+              next
+                case NDev_Confirmation_case_3
+                by contradiction /* cyclic */
+              next
+                case NDev_Confirmation_case_4
+                by contradiction /* cyclic */
+              next
+                case NDev_Confirmation_case_5
+                by contradiction /* cyclic */
+              next
+                case NDev_Confirmation_case_6
+                by contradiction /* cyclic */
+              next
+                case NDev_Confirmation_case_7
+                by contradiction /* cyclic */
+              next
+                case Prov_LinkOpen
+                solve( !KU( ~DeviceUUID ) @ #vk.22 )
+                  case NDev_Beaconing
+                  solve( splitEqs(1) )
+                    case split_case_1
+                    solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                           ) ▶₂ #vr.2 )
+                      case Receive_UserDevice_case_1
+                      solve( splitEqs(3) )
+                        case split_case_1
+                        by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                  ) ▶₃ #vr.2 )
+                      next
+                        case split_case_2
+                        solve( !KU( ECDHSecret^inv(~sk.1) ) @ #vk.26 )
+                          case NDev_Confirmation
+                          by contradiction /* cyclic */
+                        next
+                          case c_exp
+                          solve( !KU( ~sk.1 ) @ #vk.34 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        qed
+                      next
+                        case split_case_3
+                        solve( !KU( x^x.1 ) @ #vk.26 )
+                          case NDev_Confirmation
+                          by contradiction /* cyclic */
+                        next
+                          case NDev_SendPK_InBand_case_1
+                          by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                    ) ▶₃ #vr.2 )
+                        next
+                          case NDev_SendPK_InBand_case_2
+                          by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                    ) ▶₃ #vr.2 )
+                        next
+                          case Prov_SendPK_InBand_case_1
+                          by contradiction /* from formulas */
+                        next
+                          case Prov_SendPK_InBand_case_2
+                          by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                    ) ▶₃ #vr.2 )
+                        next
+                          case c_exp
+                          by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                    ) ▶₃ #vr.2 )
+                        qed
+                      next
+                        case split_case_4
+                        solve( !KU( x^(x.1*inv(~sk.1)) ) @ #vk.26 )
+                          case NDev_Confirmation
+                          by contradiction /* cyclic */
+                        next
+                          case NDev_SendPK_InBand_case_1
+                          solve( !KU( ~sk.1 ) @ #vk.33 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        next
+                          case NDev_SendPK_InBand_case_2
+                          solve( !KU( ~sk.1 ) @ #vk.35 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        next
+                          case Prov_SendPK_InBand_case_1
+                          by contradiction /* non-normal terms */
+                        next
+                          case Prov_SendPK_InBand_case_2
+                          by contradiction /* non-normal terms */
+                        next
+                          case c_exp
+                          solve( !KU( ~sk.1 ) @ #vk.36 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        qed
+                      next
+                        case split_case_5
+                        solve( !KU( x^inv((~sk.1*x.1)) ) @ #vk.26 )
+                          case NDev_Confirmation
+                          by contradiction /* cyclic */
+                        next
+                          case c_exp
+                          solve( !KU( ~sk.1 ) @ #vk.35 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        qed
+                      next
+                        case split_case_6
+                        solve( !KU( x^(x.1*inv((~sk.1*x.2))) ) @ #vk.26 )
+                          case NDev_Confirmation
+                          by contradiction /* cyclic */
+                        next
+                          case NDev_SendPK_InBand_case_1
+                          solve( !KU( ~sk.1 ) @ #vk.34 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        next
+                          case NDev_SendPK_InBand_case_2
+                          solve( !KU( ~sk.1 ) @ #vk.36 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        next
+                          case Prov_SendPK_InBand_case_1
+                          by contradiction /* non-normal terms */
+                        next
+                          case Prov_SendPK_InBand_case_2
+                          by contradiction /* non-normal terms */
+                        next
+                          case c_exp
+                          solve( !KU( ~sk.1 ) @ #vk.37 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          qed
+                        qed
+                      qed
+                    next
+                      case Receive_UserDevice_case_2
+                      solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                             ) ▶₃ #vr.2 )
+                        case Receive_UserDevice
+                        by contradiction /* from formulas */
+                      qed
+                    qed
+                  next
+                    case split_case_2
+                    solve( !KU( ECDHSecret^inv(~sk) ) @ #vk.17 )
+                      case NDev_Confirmation_case_1
+                      by contradiction /* cyclic */
+                    next
+                      case NDev_Confirmation_case_2
+                      by contradiction /* cyclic */
+                    next
+                      case c_exp
+                      solve( !KU( ~sk ) @ #vk.25 )
+                        case NDev_Confirmation_case_1
+                        by contradiction /* cyclic */
+                      next
+                        case NDev_Confirmation_case_2
+                        by contradiction /* cyclic */
+                      qed
+                    qed
+                  next
+                    case split_case_3
+                    solve( !KU( x^x.1 ) @ #vk.17 )
+                      case NDev_Confirmation
+                      by contradiction /* cyclic */
+                    next
+                      case NDev_SendPK_InBand_case_1
+                      by contradiction /* cyclic */
+                    next
+                      case NDev_SendPK_InBand_case_2
+                      by contradiction /* cyclic */
+                    next
+                      case Prov_SendPK_InBand_case_1
+                      solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                             ) ▶₂ #vr.2 )
+                        case Receive_UserDevice_case_1
+                        solve( splitEqs(3) )
+                          case split_case_1
+                          by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                    ) ▶₃ #vr.2 )
+                        next
+                          case split_case_2
+                          solve( !KU( ECDHSecret^inv(~sk.1) ) @ #vk.31 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.34 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        next
+                          case split_case_3
+                          solve( !KU( x^x.1 ) @ #vk.31 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case NDev_SendPK_InBand_case_1
+                            by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                      ) ▶₃ #vr.2 )
+                          next
+                            case NDev_SendPK_InBand_case_2
+                            by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                      ) ▶₃ #vr.2 )
+                          next
+                            case Prov_SendPK_InBand_case_1
+                            by contradiction /* from formulas */
+                          next
+                            case Prov_SendPK_InBand_case_2
+                            by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                      ) ▶₃ #vr.2 )
+                          next
+                            case c_exp
+                            by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                      ) ▶₃ #vr.2 )
+                          qed
+                        next
+                          case split_case_4
+                          solve( !KU( x^(x.1*inv(~sk.1)) ) @ #vk.31 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case NDev_SendPK_InBand_case_1
+                            solve( !KU( ~sk.1 ) @ #vk.33 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case NDev_SendPK_InBand_case_2
+                            solve( !KU( ~sk.1 ) @ #vk.35 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case Prov_SendPK_InBand_case_1
+                            by contradiction /* non-normal terms */
+                          next
+                            case Prov_SendPK_InBand_case_2
+                            by contradiction /* non-normal terms */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.36 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        next
+                          case split_case_5
+                          solve( !KU( x^inv((~sk.1*x.1)) ) @ #vk.31 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.35 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        next
+                          case split_case_6
+                          solve( !KU( x^(x.1*inv((~sk.1*x.2))) ) @ #vk.31 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case NDev_SendPK_InBand_case_1
+                            solve( !KU( ~sk.1 ) @ #vk.34 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case NDev_SendPK_InBand_case_2
+                            solve( !KU( ~sk.1 ) @ #vk.36 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case Prov_SendPK_InBand_case_1
+                            by contradiction /* non-normal terms */
+                          next
+                            case Prov_SendPK_InBand_case_2
+                            by contradiction /* non-normal terms */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.37 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        qed
+                      next
+                        case Receive_UserDevice_case_2
+                        by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                  ) ▶₃ #vr.2 )
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_2
+                      solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                             ) ▶₂ #vr.2 )
+                        case Receive_UserDevice
+                        solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                               ) ▶₃ #vr.2 )
+                          case Receive_UserDevice
+                          by contradiction /* from formulas */
+                        qed
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_3
+                      solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                             ) ▶₂ #vr.2 )
+                        case Receive_UserDevice_case_1
+                        solve( splitEqs(3) )
+                          case split_case_1
+                          by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                    ) ▶₃ #vr.2 )
+                        next
+                          case split_case_2
+                          solve( !KU( ECDHSecret^inv(~sk.1) ) @ #vk.32 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.35 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        next
+                          case split_case_3
+                          solve( !KU( x.1^x.2 ) @ #vk.32 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case NDev_SendPK_InBand_case_1
+                            by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                      ) ▶₃ #vr.2 )
+                          next
+                            case NDev_SendPK_InBand_case_2
+                            by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                      ) ▶₃ #vr.2 )
+                          next
+                            case Prov_SendPK_InBand_case_1
+                            by contradiction /* from formulas */
+                          next
+                            case Prov_SendPK_InBand_case_2
+                            by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                      ) ▶₃ #vr.2 )
+                          next
+                            case c_exp
+                            by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                      ) ▶₃ #vr.2 )
+                          qed
+                        next
+                          case split_case_4
+                          solve( !KU( x.1^(x.2*inv(~sk.1)) ) @ #vk.32 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case NDev_SendPK_InBand_case_1
+                            solve( !KU( ~sk.1 ) @ #vk.34 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case NDev_SendPK_InBand_case_2
+                            solve( !KU( ~sk.1 ) @ #vk.36 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case Prov_SendPK_InBand_case_1
+                            by contradiction /* non-normal terms */
+                          next
+                            case Prov_SendPK_InBand_case_2
+                            by contradiction /* non-normal terms */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.37 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        next
+                          case split_case_5
+                          solve( !KU( x.1^inv((~sk.1*x.2)) ) @ #vk.32 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.36 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        next
+                          case split_case_6
+                          solve( !KU( x.1^(x.2*inv((~sk.1*x.3))) ) @ #vk.32 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case NDev_SendPK_InBand_case_1
+                            solve( !KU( ~sk.1 ) @ #vk.35 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case NDev_SendPK_InBand_case_2
+                            solve( !KU( ~sk.1 ) @ #vk.37 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case Prov_SendPK_InBand_case_1
+                            by contradiction /* non-normal terms */
+                          next
+                            case Prov_SendPK_InBand_case_2
+                            by contradiction /* non-normal terms */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.38 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        qed
+                      next
+                        case Receive_UserDevice_case_2
+                        by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                  ) ▶₃ #vr.2 )
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_4
+                      solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                             ) ▶₂ #vr.2 )
+                        case Receive_UserDevice
+                        solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                               ) ▶₃ #vr.2 )
+                          case Receive_UserDevice
+                          by contradiction /* from formulas */
+                        qed
+                      qed
+                    next
+                      case c_exp
+                      solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                             ) ▶₂ #vr.2 )
+                        case Receive_UserDevice_case_1
+                        solve( splitEqs(3) )
+                          case split_case_1
+                          by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                    ) ▶₃ #vr.2 )
+                        next
+                          case split_case_2
+                          solve( !KU( ECDHSecret^inv(~sk.1) ) @ #vk.28 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.36 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        next
+                          case split_case_3
+                          solve( !KU( x.2^x.3 ) @ #vk.28 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case NDev_SendPK_InBand_case_1
+                            by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                      ) ▶₃ #vr.2 )
+                          next
+                            case NDev_SendPK_InBand_case_2
+                            by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                      ) ▶₃ #vr.2 )
+                          next
+                            case Prov_SendPK_InBand_case_1
+                            by contradiction /* from formulas */
+                          next
+                            case Prov_SendPK_InBand_case_2
+                            by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                      ) ▶₃ #vr.2 )
+                          next
+                            case c_exp
+                            by solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                                      ) ▶₃ #vr.2 )
+                          qed
+                        next
+                          case split_case_4
+                          solve( !KU( x.2^(x.3*inv(~sk.1)) ) @ #vk.28 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case NDev_SendPK_InBand_case_1
+                            solve( !KU( ~sk.1 ) @ #vk.35 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case NDev_SendPK_InBand_case_2
+                            solve( !KU( ~sk.1 ) @ #vk.37 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case Prov_SendPK_InBand_case_1
+                            by contradiction /* non-normal terms */
+                          next
+                            case Prov_SendPK_InBand_case_2
+                            by contradiction /* non-normal terms */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.38 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        next
+                          case split_case_5
+                          solve( !KU( x.2^inv((~sk.1*x.3)) ) @ #vk.28 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.37 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        next
+                          case split_case_6
+                          solve( !KU( x.2^(x.3*inv((~sk.1*x.4))) ) @ #vk.28 )
+                            case NDev_Confirmation
+                            by contradiction /* cyclic */
+                          next
+                            case NDev_SendPK_InBand_case_1
+                            solve( !KU( ~sk.1 ) @ #vk.36 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case NDev_SendPK_InBand_case_2
+                            solve( !KU( ~sk.1 ) @ #vk.38 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case Prov_SendPK_InBand_case_1
+                            by contradiction /* non-normal terms */
+                          next
+                            case Prov_SendPK_InBand_case_2
+                            by contradiction /* non-normal terms */
+                          next
+                            case c_exp
+                            solve( !KU( ~sk.1 ) @ #vk.39 )
+                              case NDev_Confirmation
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        qed
+                      next
+                        case Receive_UserDevice_case_2
+                        solve( In_UD( <'Display', 'Device', 'User'>, D2, $User, random
+                               ) ▶₃ #vr.2 )
+                          case Receive_UserDevice
+                          by contradiction /* from formulas */
+                        qed
+                      qed
+                    qed
+                  next
+                    case split_case_4
+                    solve( !KU( x^(x.1*inv(~sk)) ) @ #vk.17 )
+                      case NDev_Confirmation
+                      by contradiction /* cyclic */
+                    next
+                      case NDev_SendPK_InBand_case_1
+                      by contradiction /* cyclic */
+                    next
+                      case NDev_SendPK_InBand_case_2
+                      by contradiction /* cyclic */
+                    next
+                      case Prov_SendPK_InBand_case_1
+                      solve( !KU( ~sk ) @ #vk.31 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_2
+                      solve( !KU( ~sk ) @ #vk.33 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_3
+                      solve( !KU( ~sk ) @ #vk.31 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_4
+                      solve( !KU( ~sk ) @ #vk.33 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case c_exp
+                      solve( !KU( ~sk ) @ #vk.27 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    qed
+                  next
+                    case split_case_5
+                    solve( !KU( x^inv((~sk*x.1)) ) @ #vk.17 )
+                      case NDev_Confirmation
+                      by contradiction /* cyclic */
+                    next
+                      case c_exp
+                      solve( !KU( ~sk ) @ #vk.26 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    qed
+                  next
+                    case split_case_6
+                    solve( !KU( x^(x.1*inv((~sk*x.2))) ) @ #vk.17 )
+                      case NDev_Confirmation
+                      by contradiction /* cyclic */
+                    next
+                      case NDev_SendPK_InBand_case_1
+                      by contradiction /* cyclic */
+                    next
+                      case NDev_SendPK_InBand_case_2
+                      by contradiction /* cyclic */
+                    next
+                      case Prov_SendPK_InBand_case_1
+                      solve( !KU( ~sk ) @ #vk.32 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_2
+                      solve( !KU( ~sk ) @ #vk.34 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_3
+                      solve( !KU( ~sk ) @ #vk.32 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case Prov_SendPK_InBand_case_4
+                      solve( !KU( ~sk ) @ #vk.34 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case c_exp
+                      solve( !KU( ~sk ) @ #vk.28 )
+                        case NDev_Confirmation
+                        by contradiction /* cyclic */
+                      qed
+                    qed
+                  qed
+                next
+                  case NDev_Confirmation_case_1
+                  by contradiction /* cyclic */
+                next
+                  case NDev_Confirmation_case_2
+                  by contradiction /* cyclic */
+                next
+                  case NDev_Confirmation_case_3
+                  by contradiction /* cyclic */
+                next
+                  case NDev_Confirmation_case_4
+                  by contradiction /* cyclic */
+                next
+                  case NDev_Confirmation_case_5
+                  by contradiction /* cyclic */
+                next
+                  case NDev_Confirmation_case_6
+                  by contradiction /* cyclic */
+                next
+                  case NDev_Confirmation_case_7
+                  by contradiction /* cyclic */
+                qed
+              qed
+            qed
+          next
+            case Receive_UserDevice_case_2
+            by contradiction /* from formulas */
+          next
+            case Receive_UserDevice_case_3
+            by contradiction /* from formulas */
+          next
+            case Receive_UserDevice_case_4
+            by contradiction /* from formulas */
+          qed
+        next
+          case case_2
+          solve( (∃ #j. (USER_INPUT( ndev ) @ #j) ∧ ¬(last(#j)))  ∥
+                 (∃ m #l. (USER_ABNORM( m ) @ #l) ∧ ¬(last(#l))) )
+            case case_1
+            by contradiction /* from formulas */
+          next
+            case case_2
+            by contradiction /* from formulas */
+          qed
+        qed
+      next
+        case case_2
+        solve( (last(#i))  ∥
+               ((((∃ #j. (USER_INPUT( ndev ) @ #j) ∧ ¬(last(#j))) ∨
+                  (∃ m #l. (USER_ABNORM( m ) @ #l) ∧ ¬(last(#l))))) ∧
+                (∃ #k. (!KU( linkid ) @ #k) ∧ (¬(last(#k))) ∧ (#k < #i))) )
+          case case_1
+          solve( In_UD( <'Input', 'User', 'Device'>, $User, ndev, random ) ▶₀ #i )
+            case Receive_UserDevice_case_1
+            solve( NDevAskForInput( $P, DeviceUUID, PKType_D, OutputOOB_D,
+                                    InputOOB_D, StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue_NULL,
+                                    AuthValueURI_NULL, linkid, PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+                   ) ▶₁ #i )
+              case NDev_AskForInput_InputOOB
+              by contradiction /* from formulas */
+            qed
+          next
+            case Receive_UserDevice_case_2
+            solve( NDevAskForInput( ndev, DeviceUUID, PKType_D, OutputOOB_D,
+                                    InputOOB_D, StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue_NULL,
+                                    AuthValueURI_NULL, linkid, PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+                   ) ▶₁ #i )
+              case NDev_AskForInput_InputOOB
+              by contradiction /* from formulas */
+            qed
+          next
+            case Receive_UserDevice_case_3
+            solve( NDevAskForInput( $P, DeviceUUID, PKType_D, OutputOOB_D,
+                                    InputOOB_D, StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue_NULL,
+                                    AuthValueURI_NULL, linkid, PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+                   ) ▶₁ #i )
+              case NDev_AskForInput_InputOOB
+              by contradiction /* from formulas */
+            qed
+          next
+            case Receive_UserDevice_case_4
+            solve( NDevAskForInput( ndev, DeviceUUID, PKType_D, OutputOOB_D,
+                                    InputOOB_D, StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue_NULL,
+                                    AuthValueURI_NULL, linkid, PKType_P, AuthMethod_P, DHpkP, ECDHSecret
+                   ) ▶₁ #i )
+              case NDev_AskForInput_InputOOB
+              by contradiction /* from formulas */
+            qed
+          qed
+        next
+          case case_2
+          by contradiction /* from formulas */
+        qed
+      qed
+    next
+      case case_2
+      solve( ((∀ #j. (USER_INPUT( ndev ) @ #j) ⇒ ⊥) ∧
+              (∀ m #l. (USER_ABNORM( m ) @ #l) ⇒ ⊥))  ∥
+             (∀ #k. (!KU( linkid ) @ #k) ⇒ ¬(#k < #i)) )
+        case case_1
+        solve( (∃ x y. ((x+y) = M))  ∥ (¬(M = rm1(C, K))) )
+          case case_1
+          solve( (C = cmac((x+y), K))  ∥
+                 (∃ mk mo.
+                   ((mk+mo) = (x+y)) ∧ (mk = rm(C, mo, K))
+                  ∧
+                   ∀ x.1 y.1. ((x.1+y.1) = mk) ⇒ ⊥) )
+            case case_1
+            by contradiction /* from formulas */
+          qed
+        next
+          case case_2
+          solve( (C = cmac(M, K))  ∥
+                 (∃ mk mo.
+                   ((mk+mo) = M) ∧ (mk = rm(C, mo, K)) ∧ ∀ x y. ((x+y) = mk) ⇒ ⊥)  ∥
+                 ((∀ x y. ((x+y) = M) ⇒ ⊥) ∧ (M = rm1(C, K))) )
+            case case_1
+            by contradiction /* from formulas */
+          next
+            case case_3
+            by contradiction /* from formulas */
+          qed
+        qed
+      next
+        case case_2
+        solve( (∃ x y. ((x+y) = M))  ∥ (¬(M = rm1(C, K))) )
+          case case_1
+          solve( (C = cmac((x+y), K))  ∥
+                 (∃ mk mo.
+                   ((mk+mo) = (x+y)) ∧ (mk = rm(C, mo, K))
+                  ∧
+                   ∀ x.1 y.1. ((x.1+y.1) = mk) ⇒ ⊥) )
+            case case_1
+            by contradiction /* from formulas */
+          qed
+        next
+          case case_2
+          solve( (C = cmac(M, K))  ∥
+                 (∃ mk mo.
+                   ((mk+mo) = M) ∧ (mk = rm(C, mo, K)) ∧ ∀ x y. ((x+y) = mk) ⇒ ⊥)  ∥
+                 ((∀ x y. ((x+y) = M) ⇒ ⊥) ∧ (M = rm1(C, K))) )
+            case case_1
+            by contradiction /* from formulas */
+          next
+            case case_3
+            by contradiction /* from formulas */
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma executability:
+  exists-trace
+  "∃ #i #j.
+    (((((((((((FinishedP( ) @ #i) ∧ (FinishedD( ) @ #j)) ∧
+             (∀ #m.
+               (InitP_ReadOOBPK( '0' ) @ #m) ⇒
+               (∃ #p #q. (ProvInBandPK( ) @ #p) ∧ (NDevInBandPK( ) @ #q)))) ∧
+            (∀ #m #n.
+              ((InitP_ReadOOBPK( '1' ) @ #m) ∧ (InitD_PKType( 'InBand' ) @ #n)) ⇒
+              (∃ #p #q. (ProvInBandPK( ) @ #p) ∧ (NDevInBandPK( ) @ #q)))) ∧
+           (∀ #m #n.
+             ((InitP_ReadOOBPK( '1' ) @ #m) ∧ (InitD_PKType( 'OOB' ) @ #n)) ⇒
+             (∃ #p #q. (ProvOOBPK( ) @ #p) ∧ (NDevOOBPK( ) @ #q)))) ∧
+          (∀ #m #n.
+            ((InitP_ReadStaticOOB( '0' ) @ #m) ∧ (InitD_OutputOOB( '1' ) @ #n)) ⇒
+            (∃ #p #q. (ProvOutputOOB( ) @ #p) ∧ (NDevOutputOOB( ) @ #q)))) ∧
+         (∀ #l #m #n.
+           (((InitP_ReadStaticOOB( '1' ) @ #l) ∧ (InitD_OutputOOB( '1' ) @ #m)) ∧
+            (InitD_StaticOOB( '0' ) @ #n)) ⇒
+           (∃ #p #q. (ProvOutputOOB( ) @ #p) ∧ (NDevOutputOOB( ) @ #q)))) ∧
+        (∀ #l #m #n.
+          (((InitP_ReadStaticOOB( '0' ) @ #l) ∧ (InitD_OutputOOB( '0' ) @ #m)) ∧
+           (InitD_InputOOB( '1' ) @ #n)) ⇒
+          (∃ #p #q. (ProvInputOOB( ) @ #p) ∧ (NDevInputOOB( ) @ #q)))) ∧
+       (∀ #k #l #m #n.
+         ((((InitP_ReadStaticOOB( '1' ) @ #k) ∧ (InitD_OutputOOB( '0' ) @ #l)) ∧
+           (InitD_InputOOB( '1' ) @ #m)) ∧
+          (InitD_StaticOOB( '0' ) @ #n)) ⇒
+         (∃ #p #q. (ProvInputOOB( ) @ #p) ∧ (NDevInputOOB( ) @ #q)))) ∧
+      (∀ #m #n.
+        ((InitP_ReadStaticOOB( '1' ) @ #m) ∧ (InitD_StaticOOB( '1' ) @ #n)) ⇒
+        (∃ #p #q. (ProvStaticOOB( ) @ #p) ∧ (NDevStaticOOB( ) @ #q)))) ∧
+     (∀ #l #m #n.
+       (((InitP_ReadStaticOOB( '0' ) @ #l) ∧ (InitD_OutputOOB( '0' ) @ #m)) ∧
+        (InitD_InputOOB( '0' ) @ #n)) ⇒
+       (∃ #p #q. (ProvNoOOB( ) @ #p) ∧ (NDevNoOOB( ) @ #q)))) ∧
+    (∀ #k #l #m #n.
+      ((((InitP_ReadStaticOOB( '1' ) @ #k) ∧ (InitD_OutputOOB( '0' ) @ #l)) ∧
+        (InitD_InputOOB( '0' ) @ #m)) ∧
+       (InitD_StaticOOB( '0' ) @ #n)) ⇒
+      (∃ #p #q. (ProvNoOOB( ) @ #p) ∧ (NDevNoOOB( ) @ #q)))"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ #i #j.
+  (FinishedP( ) @ #i) ∧ (FinishedD( ) @ #j)
+ ∧
+  (∀ #m.
+    (InitP_ReadOOBPK( '0' ) @ #m)
+   ⇒
+    ∃ #p #q. (ProvInBandPK( ) @ #p) ∧ (NDevInBandPK( ) @ #q)) ∧
+  (∀ #m #n.
+    (InitP_ReadOOBPK( '1' ) @ #m) ∧ (InitD_PKType( 'InBand' ) @ #n)
+   ⇒
+    ∃ #p #q. (ProvInBandPK( ) @ #p) ∧ (NDevInBandPK( ) @ #q)) ∧
+  (∀ #m #n.
+    (InitP_ReadOOBPK( '1' ) @ #m) ∧ (InitD_PKType( 'OOB' ) @ #n)
+   ⇒
+    ∃ #p #q. (ProvOOBPK( ) @ #p) ∧ (NDevOOBPK( ) @ #q)) ∧
+  (∀ #m #n.
+    (InitP_ReadStaticOOB( '0' ) @ #m) ∧ (InitD_OutputOOB( '1' ) @ #n)
+   ⇒
+    ∃ #p #q. (ProvOutputOOB( ) @ #p) ∧ (NDevOutputOOB( ) @ #q)) ∧
+  (∀ #l #m #n.
+    (InitP_ReadStaticOOB( '1' ) @ #l) ∧
+    (InitD_OutputOOB( '1' ) @ #m) ∧
+    (InitD_StaticOOB( '0' ) @ #n)
+   ⇒
+    ∃ #p #q. (ProvOutputOOB( ) @ #p) ∧ (NDevOutputOOB( ) @ #q)) ∧
+  (∀ #l #m #n.
+    (InitP_ReadStaticOOB( '0' ) @ #l) ∧
+    (InitD_OutputOOB( '0' ) @ #m) ∧
+    (InitD_InputOOB( '1' ) @ #n)
+   ⇒
+    ∃ #p #q. (ProvInputOOB( ) @ #p) ∧ (NDevInputOOB( ) @ #q)) ∧
+  (∀ #k #l #m #n.
+    (InitP_ReadStaticOOB( '1' ) @ #k) ∧
+    (InitD_OutputOOB( '0' ) @ #l) ∧
+    (InitD_InputOOB( '1' ) @ #m) ∧
+    (InitD_StaticOOB( '0' ) @ #n)
+   ⇒
+    ∃ #p #q. (ProvInputOOB( ) @ #p) ∧ (NDevInputOOB( ) @ #q)) ∧
+  (∀ #m #n.
+    (InitP_ReadStaticOOB( '1' ) @ #m) ∧ (InitD_StaticOOB( '1' ) @ #n)
+   ⇒
+    ∃ #p #q. (ProvStaticOOB( ) @ #p) ∧ (NDevStaticOOB( ) @ #q)) ∧
+  (∀ #l #m #n.
+    (InitP_ReadStaticOOB( '0' ) @ #l) ∧
+    (InitD_OutputOOB( '0' ) @ #m) ∧
+    (InitD_InputOOB( '0' ) @ #n)
+   ⇒
+    ∃ #p #q. (ProvNoOOB( ) @ #p) ∧ (NDevNoOOB( ) @ #q)) ∧
+  (∀ #k #l #m #n.
+    (InitP_ReadStaticOOB( '1' ) @ #k) ∧
+    (InitD_OutputOOB( '0' ) @ #l) ∧
+    (InitD_InputOOB( '0' ) @ #m) ∧
+    (InitD_StaticOOB( '0' ) @ #n)
+   ⇒
+    ∃ #p #q. (ProvNoOOB( ) @ #p) ∧ (NDevNoOOB( ) @ #q))"
+*/
+simplify
+solve( ProvDistributed( Prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                        SecureOption, NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI,
+                        AuthValue, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P,
+                        AuthMethod_P, skP, DHpkP, DHpkD, ECDHSecret, Np, ConfirmSALT, ECDH1,
+                        ECDH2, CK, Cp, Cd, Nd, ProvisioningSALT, SessionKey, ProvData, DevKey
+       ) ▶₁ #i )
+  case Prov_Distribute_case_3
+  solve( (Cd =
+          cmac((Nd+<~random, '2'>),
+               cmac('prck', cmac((<z, '1'>+<z.1, '2'>), s1(<'g'^~sk, DHpkD>)))))  ∥
+         (∃ mk mo.
+           ((mk+mo) = (Nd+<~random, '2'>)) ∧
+           (mk =
+            rm(Cd, mo,
+               cmac('prck', cmac((<z, '1'>+<z.1, '2'>), s1(<'g'^~sk, DHpkD>)))))
+          ∧
+           ∀ x y. ((x+y) = mk) ⇒ ⊥) )
+    case case_1
+    solve( NDevSentNonce( NDev.1, DeviceUUID.1, PKType_D, OutputOOB_D,
+                          InputOOB_D, StaticOOB_D.1, skD, DHpkD.1, OOBPKURI.1, AuthValue,
+                          AuthValueURI.1, LinkID.1, PKType_P, AuthMethod_P, DHpkP, ECDHSecret.1,
+                          Cp, Nd.1, ConfirmSALT, ECDH1, ECDH2, CK, Cd, Np.1, ProvisioningSALT,
+                          SessionKey
+           ) ▶₁ #j )
+      case NDev_SendNonce_case_2
+      solve( (Cp =
+              cmac((Np.1+<AuthValue_In, '2'>),
+                   cmac('prck', cmac((<z.2, '1'>+<z.3, '2'>), s1(<DHpkP, 'g'^~sk.1>)))))  ∥
+             (∃ mk mo.
+               ((mk+mo) = (Np.1+<AuthValue_In, '2'>)) ∧
+               (mk =
+                rm(Cp, mo,
+                   cmac('prck', cmac((<z.2, '1'>+<z.3, '2'>), s1(<DHpkP, 'g'^~sk.1>)))))
+              ∧
+               ∀ x y. ((x+y) = mk) ⇒ ⊥) )
+        case case_1
+        solve( ProvCalculatedECDH( Prov, NetKey.2, ReadOOBPK, ReadStaticOOB,
+                                   SecureOption, NDev, DeviceUUID.2, LinkID.2, OOBPKURI.1,
+                                   AuthValueURI_NULL, AuthValue_NULL, PKType_D, OutputOOB_D, InputOOB_D,
+                                   StaticOOB_D.1, PKType_P, 'InputOOB', skP, DHpkP.1, DHpkD.1, ECDHSecret.2
+               ) ▶₁ #p )
+          case Prov_CalculateECDH
+          solve( NDevCalculatedECDH( NDev, DeviceUUID.2, PKType_D, OutputOOB_D,
+                                     InputOOB_D, StaticOOB_D.1, skD, DHpkD.1, OOBPKURI.1, AuthValue,
+                                     AuthValueURI.1, LinkID.2, PKType_P, 'InputOOB', DHpkP.1, ECDHSecret.2
+                 ) ▶₀ #q )
+            case NDev_CalculateECDH
+            solve( ProvSentStart( Prov, NetKey.2, ReadOOBPK, ReadStaticOOB,
+                                  SecureOption, NDev, DeviceUUID.2, LinkID.2, OOBPKURI.1, AuthValueURI.1,
+                                  AuthValue, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D.1, 'InBand',
+                                  AuthMethod_P
+                   ) ▶₁ #p.1 )
+              case Prov_SendStart
+              solve( NDevReceivedStart( NDev, DeviceUUID.2, PKType_D, OutputOOB_D,
+                                        InputOOB_D, StaticOOB_D.1, skD_NULL, DHpkD_NULL, OOBPKURI_NULL,
+                                        AuthValue, AuthValueURI.1, LinkID.2, 'InBand', AuthMethod_P
+                     ) ▶₂ #q.1 )
+                case NDev_ReceiveStart
+                solve( splitEqs(3) )
+                  case split_case_1
+                  solve( splitEqs(5) )
+                    case split_case_2
+                    solve( !KU( senc(NetKey.1,
+                                     cmac('prsk',
+                                          cmac((<fst(ECDHSecret.1), '1'>+<snd(ECDHSecret.1), '2'>),
+                                               s1(<s1(<DHpkP, 'g'^~sk.1>), Np.1, ~Nd.1, '1'>))))
+                           ) @ #vk.17 )
+                      case Prov_Distribute
+                      solve( !KU( cmac((<~Nd, '1'>+<~random, '2'>),
+                                       cmac('prck',
+                                            cmac((<fst('g'^(~sk*~sk.1)), '1'>+<snd('g'^(~sk*~sk.1)), '2'>),
+                                                 s1(<'g'^~sk, 'g'^~sk.1>))))
+                             ) @ #vk.19 )
+                        case NDev_Confirmation
+                        solve( In_UD( <'Display', 'Device', 'User'>, $P, $User.2, ~random
+                               ) ▶₂ #vr.19 )
+                          case Receive_UserDevice
+                          solve( In_UD( <'AskForInput', 'Device', 'User'>, $D, $User, 'Input'
+                                 ) ▶₃ #vr.19 )
+                            case Receive_UserDevice
+                            solve( !KU( ~LinkID ) @ #vk.5 )
+                              case Prov_LinkOpen
+                              solve( !KU( ~DeviceUUID.1 ) @ #vk.45 )
+                                case NDev_Beaconing
+                                solve( !KU( ~Nd ) @ #vk.46 )
+                                  case NDev_SendNonce
+                                  solve( !KU( ~Np ) @ #vk.47 )
+                                    case Prov_SendNonce
+                                    solve( !KU( cmac((<~Np, '1'>+<~random, '2'>),
+                                                     cmac('prck',
+                                                          cmac((<fst('g'^(~sk*~sk.1)), '1'>+
+                                                                <snd('g'^(~sk*~sk.1)), '2'>),
+                                                               s1(<'g'^~sk, 'g'^~sk.1>))))
+                                           ) @ #vk.43 )
+                                      case Prov_Confirmation
+                                      solve( !KU( 'g'^~sk.1 ) @ #vk.27 )
+                                        case NDev_SendPK_InBand
+                                        solve( !KU( 'g'^~sk ) @ #vk.44 )
+                                          case Prov_SendPK_InBand
+                                          SOLVED // trace found
+                                        qed
+                                      qed
+                                    qed
+                                  qed
+                                qed
+                              qed
+                            qed
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma Noninj_Agreement_NDev:
+  all-traces
+  "∀ ndev m #i.
+    (Commit_NDev( ndev, m ) @ #i) ⇒
+    (∃ prov #j. Running_Prov( prov, ndev, m ) @ #j)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ndev m #i.
+  (Commit_NDev( ndev, m ) @ #i)
+ ∧
+  ∀ prov #j. (Running_Prov( prov, ndev, m ) @ #j) ⇒ ⊥"
+*/
+simplify
+solve( NDevSentNonce( ndev, DeviceUUID, PKType_D, OutputOOB_D,
+                      InputOOB_D, StaticOOB_D, skD, DHpkD, OOBPKURI, AuthValue, AuthValueURI,
+                      LinkID, PKType_P, AuthMethod_P, DHpkP, ECDHSecret, Cp, Nd, ConfirmSALT,
+                      ECDH1, ECDH2, CK, Cd, Np, ProvisioningSALT, SessionKey
+       ) ▶₁ #i )
+  case NDev_SendNonce_case_2
+  solve( (Cp =
+          cmac((Np+<AuthValue_In, '2'>),
+               cmac('prck', cmac((<z, '1'>+<z.1, '2'>), s1(<DHpkP, 'g'^~sk>)))))  ∥
+         (∃ mk mo.
+           ((mk+mo) = (Np+<AuthValue_In, '2'>)) ∧
+           (mk =
+            rm(Cp, mo,
+               cmac('prck', cmac((<z, '1'>+<z.1, '2'>), s1(<DHpkP, 'g'^~sk>)))))
+          ∧
+           ∀ x y. ((x+y) = mk) ⇒ ⊥) )
+    case case_1
+    solve( splitEqs(2) )
+      case split_case_1
+      solve( !KU( senc(NetKey,
+                       cmac('prsk',
+                            cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                 s1(<s1(<DHpkP, 'g'^~sk>), Np, ~Nd, '1'>))))
+             ) @ #vk.8 )
+        case c_senc
+        solve( !KU( cmac((Np+<AuthValue_In, '2'>),
+                         cmac('prck',
+                              cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                   s1(<DHpkP, 'g'^~sk>))))
+               ) @ #vk.10 )
+          case c_cmac
+          solve( !KU( cmac('prsk',
+                           cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                s1(<s1(<DHpkP, 'g'^~sk>), Np, ~Nd, '1'>)))
+                 ) @ #vk.31 )
+            case c_cmac
+            solve( !KU( cmac('prck',
+                             cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                  s1(<DHpkP, 'g'^~sk>)))
+                   ) @ #vk.32 )
+              case c_cmac
+              solve( !KU( cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                               s1(<s1(<DHpkP, 'g'^~sk>), Np, ~Nd, '1'>))
+                     ) @ #vk.37 )
+                case c_cmac
+                solve( !KU( s1(<s1(<DHpkP, 'g'^~sk>), Np, ~Nd, '1'>) ) @ #vk.42 )
+                  case c_s1
+                  solve( !KU( s1(<DHpkP, 'g'^~sk>) ) @ #vk.50 )
+                    case c_s1
+                    solve( !KU( cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                     s1(<DHpkP, 'g'^~sk>))
+                           ) @ #vk.46 )
+                      case c_cmac
+                      solve( splitEqs(1) )
+                        case split_case_1
+                        solve( !KU( fst(DHpkP^~sk) ) @ #vk.48 )
+                          case c_fst
+                          solve( !KU( snd(DHpkP^~sk) ) @ #vk.51 )
+                            case c_snd
+                            solve( !KU( DHpkP^~sk ) @ #vk.54 )
+                              case NDev_SendPK_InBand
+                              solve( In_UD( <'Display', 'Device', 'User'>, $P, $User, AuthValue_In
+                                     ) ▶₂ #vr.7 )
+                                case Receive_UserDevice
+                                solve( !KU( ~random ) @ #vk.50 )
+                                  case Prov_Confirmation
+                                  solve( !KU( ~Np.1 ) @ #vk.65 )
+                                    case Prov_SendNonce
+                                    solve( splitEqs(7) )
+                                      case split_case_1
+                                      solve( !KU( cmac('prck',
+                                                       cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                                            s1(<'g'^~sk.1, DHpkD>)))
+                                             ) @ #vk.66 )
+                                        case c_cmac
+                                        solve( !KU( cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                                         s1(<'g'^~sk.1, DHpkD>))
+                                               ) @ #vk.69 )
+                                          case c_cmac
+                                          solve( !KU( s1(<'g'^~sk.1, DHpkD>) ) @ #vk.73 )
+                                            case c_s1
+                                            solve( splitEqs(5) )
+                                              case split_case_1
+                                              solve( !KU( fst(DHpkD^~sk.1) ) @ #vk.75 )
+                                                case c_fst
+                                                solve( !KU( snd(DHpkD^~sk.1) ) @ #vk.76 )
+                                                  case c_snd
+                                                  solve( !KU( DHpkD^~sk.1 ) @ #vk.78 )
+                                                    case Prov_SendPK_InBand
+                                                    solve( In_UD( <'AskForInput', 'Device', 'User'>, $D,
+                                                                  $User, 'Input'
+                                                           ) ▶₃ #vr.7 )
+                                                      case Receive_UserDevice
+                                                      solve( !KU( ~LinkID.1 ) @ #vk.44 )
+                                                        case Prov_LinkOpen
+                                                        solve( !KU( ~DeviceUUID ) @ #vk.63 )
+                                                          case NDev_Beaconing
+                                                          solve( !KU( ~Nd ) @ #vk.72 )
+                                                            case NDev_Confirmation
+                                                            SOLVED // trace found
+                                                          qed
+                                                        qed
+                                                      qed
+                                                    qed
+                                                  qed
+                                                qed
+                                              qed
+                                            qed
+                                          qed
+                                        qed
+                                      qed
+                                    qed
+                                  qed
+                                qed
+                              qed
+                            qed
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma Noninj_Agreement_Prov:
+  all-traces
+  "∀ prov ndev m #i.
+    (Commit_Prov( prov, ndev, m ) @ #i) ⇒
+    (∃ #j. Running_NDev( ndev, m ) @ #j)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ prov ndev m #i.
+  (Commit_Prov( prov, ndev, m ) @ #i)
+ ∧
+  ∀ #j. (Running_NDev( ndev, m ) @ #j) ⇒ ⊥"
+*/
+simplify
+solve( ProvDistributed( prov, NetKey, ReadOOBPK, ReadStaticOOB,
+                        SecureOption, ndev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI,
+                        AuthValue, PKType_D, OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P,
+                        AuthMethod_P, skP, DHpkP, DHpkD, ECDHSecret, Np, ConfirmSALT, ECDH1,
+                        ECDH2, CK, Cp, Cd, Nd, ProvisioningSALT, SessionKey, ProvData, DevKey
+       ) ▶₁ #i )
+  case Prov_Distribute_case_3
+  solve( (Cd =
+          cmac((Nd+<~random, '2'>),
+               cmac('prck', cmac((<z, '1'>+<z.1, '2'>), s1(<'g'^~sk, DHpkD>)))))  ∥
+         (∃ mk mo.
+           ((mk+mo) = (Nd+<~random, '2'>)) ∧
+           (mk =
+            rm(Cd, mo,
+               cmac('prck', cmac((<z, '1'>+<z.1, '2'>), s1(<'g'^~sk, DHpkD>)))))
+          ∧
+           ∀ x y. ((x+y) = mk) ⇒ ⊥) )
+    case case_2_case_1
+    solve( splitEqs(2) )
+      case split_case_1
+      solve( !KU( rm(Cd, <~random, '2'>,
+                     cmac('prck',
+                          cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                               s1(<'g'^~sk, DHpkD>))))
+             ) @ #vk.9 )
+        case c_rm
+        solve( !KU( ~random ) @ #vk.30 )
+          case Prov_Confirmation
+          solve( !KU( cmac('prck',
+                           cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                s1(<'g'^~sk, DHpkD>)))
+                 ) @ #vk.31 )
+            case c_cmac
+            solve( !KU( cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                             s1(<'g'^~sk, DHpkD>))
+                   ) @ #vk.35 )
+              case c_cmac
+              solve( !KU( s1(<'g'^~sk, DHpkD>) ) @ #vk.39 )
+                case c_s1
+                solve( splitEqs(1) )
+                  case split_case_1
+                  solve( !KU( fst(DHpkD^~sk) ) @ #vk.41 )
+                    case c_fst
+                    solve( !KU( snd(DHpkD^~sk) ) @ #vk.42 )
+                      case c_snd
+                      solve( !KU( DHpkD^~sk ) @ #vk.44 )
+                        case Prov_SendPK_InBand
+                        solve( !KU( ~LinkID ) @ #vk.14 )
+                          case Prov_LinkOpen
+                          solve( !KU( ~Np ) @ #vk.42 )
+                            case Prov_SendNonce
+                            SOLVED // trace found
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma Secrecy_Keys:
+  all-traces
+  "∀ sessionkey devkey netkey #i.
+    (Secret( sessionkey, devkey, netkey ) @ #i) ⇒
+    (¬(((∃ #j. K( netkey ) @ #j) ∨ (∃ #k. K( sessionkey ) @ #k)) ∨
+       (∃ #l. K( devkey ) @ #l)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ sessionkey devkey netkey #i.
+  (Secret( sessionkey, devkey, netkey ) @ #i)
+ ∧
+  ((∃ #j. (K( netkey ) @ #j)) ∨
+   (∃ #k. (K( sessionkey ) @ #k)) ∨
+   (∃ #l. (K( devkey ) @ #l)))"
+*/
+simplify
+solve( (∃ #j. (K( netkey ) @ #j))  ∥ (∃ #k. (K( sessionkey ) @ #k))  ∥
+       (∃ #l. (K( cmac('prdk', cmac((ECDH1+ECDH2), ProvisioningSALT)) ) @ #l)) )
+  case case_1
+  solve( ProvChecked( Prov, netkey, ReadOOBPK, ReadStaticOOB, SecureOption,
+                      NDev, DeviceUUID, LinkID, OOBPKURI, AuthValueURI, AuthValue, PKType_D,
+                      OutputOOB_D, InputOOB_D, StaticOOB_D, PKType_P, AuthMethod_P, skP, DHpkP,
+                      DHpkD, ECDHSecret, Np, ConfirmSALT, ECDH1, ECDH2, CK, Cp, Cd, Nd,
+                      ProvisioningSALT, sessionkey
+         ) ▶₀ #i )
+    case Prov_Check_case_2
+    solve( (Cd =
+            cmac((Nd+<~m, '2'>),
+                 cmac('prck', cmac((<z, '1'>+<z.1, '2'>), s1(<'g'^~sk, DHpkD>)))))  ∥
+           (∃ mk mo.
+             ((mk+mo) = (Nd+<~m, '2'>)) ∧
+             (mk =
+              rm(Cd, mo,
+                 cmac('prck', cmac((<z, '1'>+<z.1, '2'>), s1(<'g'^~sk, DHpkD>)))))
+            ∧
+             ∀ x y. ((x+y) = mk) ⇒ ⊥) )
+      case case_2_case_1
+      solve( !KU( ~NetKey ) @ #vk )
+        case Prov_Distribute
+        solve( splitEqs(2) )
+          case split_case_1
+          solve( !KU( rm(Cd, <~m, '2'>,
+                         cmac('prck',
+                              cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                   s1(<'g'^~sk, DHpkD>))))
+                 ) @ #vk.7 )
+            case c_rm
+            solve( !KU( ~m ) @ #vk.28 )
+              case Prov_Confirmation
+              solve( !KU( cmac('prsk',
+                               cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                    s1(<s1(<'g'^~sk, DHpkD>), <~Np, '1'>, 
+                                        rm(Cd, <~m, '2'>,
+                                           cmac('prck',
+                                                cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                                     s1(<'g'^~sk, DHpkD>))))
+                                       >)))
+                     ) @ #vk.27 )
+                case c_cmac
+                solve( !KU( cmac('prck',
+                                 cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                      s1(<'g'^~sk, DHpkD>)))
+                       ) @ #vk.29 )
+                  case c_cmac
+                  solve( !KU( cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                   s1(<s1(<'g'^~sk, DHpkD>), <~Np, '1'>, 
+                                       rm(Cd, <~m, '2'>,
+                                          cmac('prck',
+                                               cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                                    s1(<'g'^~sk, DHpkD>))))
+                                      >))
+                         ) @ #vk.33 )
+                    case c_cmac
+                    solve( !KU( s1(<s1(<'g'^~sk, DHpkD>), <~Np, '1'>, 
+                                    rm(Cd, <~m, '2'>,
+                                       cmac('prck',
+                                            cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                                 s1(<'g'^~sk, DHpkD>))))
+                                   >)
+                           ) @ #vk.39 )
+                      case c_s1
+                      solve( !KU( s1(<'g'^~sk, DHpkD>) ) @ #vk.44 )
+                        case c_s1
+                        solve( !KU( cmac((<fst(ECDHSecret), '1'>+<snd(ECDHSecret), '2'>),
+                                         s1(<'g'^~sk, DHpkD>))
+                               ) @ #vk.43 )
+                          case c_cmac
+                          solve( splitEqs(1) )
+                            case split_case_1
+                            solve( !KU( fst(DHpkD^~sk) ) @ #vk.44 )
+                              case c_fst
+                              solve( !KU( snd(DHpkD^~sk) ) @ #vk.45 )
+                                case c_snd
+                                solve( !KU( DHpkD^~sk ) @ #vk.47 )
+                                  case Prov_SendPK_InBand
+                                  solve( In_UD( <'AskForInput', 'Device', 'User'>, $P, $User, 'Input'
+                                         ) ▶₃ #vr.8 )
+                                    case Receive_UserDevice_case_1
+                                    solve( In_UD( <'AskForInput', 'Device', 'User'>, NDev, $User, 'Input'
+                                           ) ▶₄ #vr.8 )
+                                      case Receive_UserDevice
+                                      solve( splitEqs(12) )
+                                        case split_case_1
+                                        solve( !KU( ~LinkID ) @ #vk.20 )
+                                          case Prov_LinkOpen
+                                          solve( !KU( ~Np ) @ #vk.46 )
+                                            case Prov_SendNonce
+                                            solve( !KU( ~DeviceUUID.1 ) @ #vk.58 )
+                                              case NDev_Beaconing
+                                              SOLVED // trace found
+                                            qed
+                                          qed
+                                        qed
+                                      qed
+                                    qed
+                                  qed
+                                qed
+                              qed
+                            qed
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+/* All well-formedness checks were successful. */
+
+end
+maude tool: 'maude'
+ checking version: 2.7.1. OK.
+ checking installation: OK.
+
+
+analyzing: ./Results/INBAND_IN/MESH_01InBand011.spthy
+
+------------------------------------------------------------------------------
+analyzed: ./Results/INBAND_IN/MESH_01InBand011.spthy
+
+  output:          ./Results/INBAND_IN/proofs/Out_All_MESH_01InBand011.spthy
+  processing time: 4993.593309347s
+  types (all-traces): verified (682 steps)
+  executability (exists-trace): verified (23 steps)
+  Noninj_Agreement_NDev (all-traces): falsified - found trace (32 steps)
+  Noninj_Agreement_Prov (all-traces): falsified - found trace (16 steps)
+  Secrecy_Keys (all-traces): falsified - found trace (25 steps)
+
+------------------------------------------------------------------------------
+
+==============================================================================
+summary of summaries:
+
+analyzed: ./Results/INBAND_IN/MESH_01InBand011.spthy
+
+  output:          ./Results/INBAND_IN/proofs/Out_All_MESH_01InBand011.spthy
+  processing time: 4993.593309347s
+  types (all-traces): verified (682 steps)
+  executability (exists-trace): verified (23 steps)
+  Noninj_Agreement_NDev (all-traces): falsified - found trace (32 steps)
+  Noninj_Agreement_Prov (all-traces): falsified - found trace (16 steps)
+  Secrecy_Keys (all-traces): falsified - found trace (25 steps)
+
+==============================================================================

@@ -36,23 +36,6 @@ def get_spthy_paths(res_folder, proof_flag = True):
     return spthy_list
 
 
-def choose_color(theory_class):
-    """
-    Para:
-        theory_class: 'JW' or 'NC' or 'PE' or 'OOB'
-    Return:
-        '' or '' or '' or ''
-    """
-    if theory_class == 'JW':
-        return 'azure'
-    elif theory_class == 'NC':
-        return 'lavenderblush'
-    elif theory_class == 'PE':
-        return 'mediumspringgreen'
-    elif theory_class == 'OOB':
-        return 'moccasin'
-
-
 def gen_theory(spthy):
     """
     Para:
@@ -68,7 +51,7 @@ def gen_theory(spthy):
         summary_list = summary.split('\n')
 
         # locate the results
-        index = summary_list.index('summary of summaries:')
+        index = summary_list.index('summary of summaries:\r')
         # res_list contains the lemmas and results
         res_list = summary_list[index+4:-3]
             
@@ -105,24 +88,6 @@ def gen_theory(spthy):
 
     return theory
 
-def cmp_class(x,y):
-    """
-    Compare the association models: NC > PE > JW > OOB
-    """
-    if x == 'NC':
-        return 1
-    elif x == 'PE':
-        if y == 'NC':
-            return -1
-        else:
-            return 1
-    elif x == 'JW':
-        if y == 'OOB':
-            return 1
-        else:
-            return -1
-    elif x == 'OOB':
-        return -1
 
 
 if __name__ == "__main__":

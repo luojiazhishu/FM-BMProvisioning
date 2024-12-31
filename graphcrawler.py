@@ -1,14 +1,4 @@
 #!/usr/bin/python
-# DONE:
-#     1. After running Tamarin Interactive mode in your shell, 
-#        run this script with the file being proved to automatically
-#        download the trace picture to a folder named by the file's name.
-#     2. Can work with/without intermediate results, but need to 
-#        comment some code manually for now.
-# TODO:
-#     1. Detect whether run with or without intermediate results.
-#     2. The path saving the pictures.
-#        - Maybe related to the way it works with the makefile.
 
 import requests, json, sys, os
 from bs4 import BeautifulSoup
@@ -68,7 +58,6 @@ def find_traces(prefix, link):
         print("Perhaps no invalid proof steps?")
         trace_links2 = []
 
-    print(trace_links1 + trace_links2)
     return trace_links1 + trace_links2
 
     
@@ -118,10 +107,9 @@ def save_graph(prefix, link, path):
     Return:
         None. The graph will be saved to proper place named by lemma's name.
     """
-    print("Graph link: " + link)
+    print("Graph: " + link)
     graph_name = link.split('/')[6]
     graph_req = requests.get(prefix + link)
-    # TODO: save the .svg in ./Results/proofs/src/$FILENAME/$LEMMANAME.svg
     if not os.path.exists(path):
         os.makedirs(path)
     with open(path + graph_name + '.svg', 'wb') as graph_file:
@@ -138,18 +126,10 @@ if __name__ == "__main__":
     except IndexError:
         path = input("Which file do you want to analysis? (relative path is needed)\n")
 
-    # TODO:
-    # if path.split has 'tmp':
-    #     save_path = ....
-    # else:
-    #     save_path = ....
     file_name = path.split('/')[-1]
     folder = os.path.dirname(path)
     if folder.split('/')[-1] == 'tmp':
         folder = os.path.dirname(folder)
-
-    if folder.split('/')[-1] != 'proofs':
-        folder += '/proofs'
 
     save_path = folder + '/src/' + file_name.split('.')[0] + '/'
 
@@ -158,28 +138,13 @@ if __name__ == "__main__":
 
     file_link = select_file(url_prefix, file_name)
 
-    # No intermediate results.
-    sorry_links = select_lemmas(url_prefix, file_link)
-    for sorry_link in sorry_links:
-        print("lemma: " + sorry_link)
-        graph_links = get_graph(url_prefix, sorry_link)
+    trace_links = find_traces(url_prefix, file_link)
+    for trace_link in trace_links:
+        graph_links = get_graph_interactive(url_prefix, trace_link)
 
         if graph_links == []:
             print("This lemma has no paths")
         else:
             for graph_link in graph_links:    
                 # Only one graph in graphs actually 
-                save_graph(url_prefix, graph_link, save_path)
-
-
-    # # Use intermediate results.
-    # trace_links = find_traces(url_prefix, file_link)
-    # for trace_link in trace_links:
-    #     graph_links = get_graph_interactive(url_prefix, trace_link)
-
-    #     if graph_links == []:
-    #         print("This lemma has no paths")
-    #     else:
-    #         for graph_link in graph_links:    
-    #             # Only one graph in graphs actually 
-    #             save_graph(url_prefix,graph_link,save_path)
+                save_graph(url_prefix,graph_link,save_path)

@@ -3,9 +3,8 @@
 # automatically.
 
 import subprocess, os, sys, shutil, time
-import logging
-
 import collect
+import logging
 
 # config log
 LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
@@ -29,6 +28,51 @@ def tmp_copy(spthy):
 
     tmp_spthy = shutil.copy(spthy, tmp_folder)
 
+    with open(tmp_spthy, "r", encoding="utf8") as f:
+        tmp_content = f.read()
+
+    tmp_content = tmp_content.replace("restriction Atomic:", 
+                                      """
+rule (modulo AC) d_0_rm:
+    [ !KD( cmac(mo + mk, k) ), !KU( mo ), !KU( k ) ]
+    --[
+        Atomic(mk)
+    ]->
+    [ !KD( mo + mk ) ]
+
+rule (modulo AC) d_1_rm:
+    [ !KD( cmac(m, k) ), !KU( k ) ]
+    --[
+        Atomic(m)
+    ]->
+    [ !KD( m ) ]
+
+rule (modulo AC) d_0_0_rm_cmac:
+    [ !KD( mo + mk ), !KU( mo ), !KU( k ), !KU( k ) ]
+    --[
+        Atomic(mk)
+    ]->
+    [ !KD( mo + mk ) ]
+
+rule (modulo AC) d_0_pair:
+    [ !KD( fst(x) ), !KU( snd(x) ) ]
+    --[
+        Neq(<fst(x),snd(x)>, x)
+    ]->
+    [ !KD( x ) ]
+
+rule (modulo AC) d_1_pair:
+    [ !KD( snd(x) ), !KU( fst(x) ) ]
+    --[
+        Neq(<fst(x),snd(x)>, x)
+    ]->
+    [ !KD( x ) ]
+
+restriction Atomic:""")
+    
+    with open(tmp_spthy, "w", encoding="utf8") as f:
+        f.write(tmp_content)
+
     return tmp_spthy
 
 
@@ -43,23 +87,6 @@ def tmp_delete(tmp_spthy):
     tmp_folder = os.path.dirname(tmp_spthy)
     shutil.rmtree(tmp_folder)
 
-
-def rename_graphfolder(spthy):
-    """ Rename the graph folder if using original spthy files
-        for consistency with intermediate version.
-
-        A temporary version. not general
-
-    Para:
-        spthy: .spthy under Results/*/. folder
-    Return:
-        None.
-        graphs are saved under Results/*/proofs/src/spthy_name/
-    """
-    graph_folder = os.path.dirname(spthy) + '/proofs/src/' + spthy.split('/')[-1].split('.')[0]
-    os.rename(graph_folder, os.path.dirname(graph_folder) + '/Out_All_' + spthy.split('/')[-1].split('.')[0])
-
-
 def main():
     try:
         res_folder = sys.argv[1]
@@ -69,10 +96,7 @@ def main():
         logging.info("folder " + res_folder + " has been input.")
 
     logging.info("Starting collect spthy files...")
-
-    flag = False
-    spthy_list = collect.get_spthy_paths(res_folder,proof_flag = flag)
-
+    spthy_list = collect.get_spthy_paths(res_folder)
 
     print("{} .spthy in total".format(len(spthy_list)))
     logging.info("Finished collect spthy files. {} .spthy in total".format(len(spthy_list)))
@@ -114,8 +138,6 @@ def main():
         os.remove('nohup.out')
 
         tmp_delete(tmp_spthy)
-        if not flag: rename_graphfolder(spthy)
-
     logging.info("End enumerate spthy file list")
 
 
@@ -125,4 +147,3 @@ if __name__ == "__main__":
     finally:
         t = time.strftime('%Y%m%d_%H%M', time.localtime())
         os.rename("./rescrawler.log", "./crawlog_{}.txt".format(t))
-
